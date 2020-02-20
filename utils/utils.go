@@ -3,10 +3,10 @@ package main
 import (
 	"encoding/json"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/schema"
 	"log"
 	"math"
 	"net/http"
-	"strconv"
 	"strings"
 )
 
@@ -16,8 +16,21 @@ const CONST_CONFIDENCE_LOW = "LOW"
 const CONST_CONFIDENCE_MEDIUM = "MEDIUM"
 const CONST_CONFIDENCE_HIGH = "HIGH"
 
+type CagrInput struct {
+	Years      float64 `schema:"years"`
+	Eps        float64 `schema:"eps"`
+	Payout     float64 `schema:"payout"`
+	Growth     float64 `schema:"growth"`
+	PeTerminal float64 `schema:"peterminal"`
+	Price      float64 `schema:"price"`
+}
+
 type CagrRet struct {
 	Cagr float64 `json:"cagr"`
+}
+
+type ConfidenceInput struct {
+	Research string `schema:"research"`
 }
 
 type ConfidenceRet struct {
@@ -38,18 +51,20 @@ func setupRouter(router *mux.Router) {
 func Confidence(w http.ResponseWriter, r *http.Request) {
 	log.Println("Confidence called...")
 
-	research, ok := r.URL.Query()["research"]
-	if !ok {
-		log.Println("Url Param 'research' is missing")
+	args := new(ConfidenceInput)
+	decoder := schema.NewDecoder()
+	err := decoder.Decode(args, r.URL.Query())
+	if err != nil {
+		log.Println(err)
 		return
 	}
 
 	result := CONST_CONFIDENCE_NONE
-	if strings.Contains(research[0], CONST_CONFIDENCE_HIGH) {
+	if strings.Contains(args.Research, CONST_CONFIDENCE_HIGH) {
 		result = CONST_CONFIDENCE_HIGH
-	} else if strings.Contains(research[0], CONST_CONFIDENCE_MEDIUM) {
+	} else if strings.Contains(args.Research, CONST_CONFIDENCE_MEDIUM) {
 		result = CONST_CONFIDENCE_MEDIUM
-	} else if strings.Contains(research[0], CONST_CONFIDENCE_LOW) {
+	} else if strings.Contains(args.Research, CONST_CONFIDENCE_LOW) {
 		result = CONST_CONFIDENCE_LOW
 	}
 
@@ -60,64 +75,22 @@ func Confidence(w http.ResponseWriter, r *http.Request) {
 func Cagr(w http.ResponseWriter, r *http.Request) {
 	log.Println("Cagr called...")
 
-	argYears, ok := r.URL.Query()["years"]
-	if !ok {
-		log.Println("Url Param 'years' is missing")
-		return
-	}
-
-	years, err := strconv.ParseFloat(argYears[0], 64)
+	args := new(CagrInput)
+	decoder := schema.NewDecoder()
+	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
+		log.Println(err)
 		return
 	}
-
-	argEps, ok := r.URL.Query()["eps"]
-	if !ok {
-		log.Println("Url Param 'eps' is missing")
-		return
-	}
-
-	eps, err := strconv.ParseFloat(argEps[0], 64)
-
-	argPayout, ok := r.URL.Query()["payout"]
-	if !ok {
-		log.Println("Url Param 'payout' is missing")
-		return
-	}
-
-	payout, err := strconv.ParseFloat(argPayout[0], 64)
-
-	argGrowth, ok := r.URL.Query()["growth"]
-	if !ok {
-		log.Println("Url Param 'growth' is missing")
-		return
-	}
-
-	growth, err := strconv.ParseFloat(argGrowth[0], 64)
-
-	argPeterminal, ok := r.URL.Query()["peterminal"]
-	if !ok {
-		log.Println("Url Param 'peterminal' is missing")
-		return
-	}
-
-	peterminal, err := strconv.ParseFloat(argPeterminal[0], 64)
-
-	argPrice, ok := r.URL.Query()["price"]
-	if !ok {
-		log.Println("Url Param 'price' is missing")
-		return
-	}
-
-	price, err := strconv.ParseFloat(argPrice[0], 64)
 
 	div_bucket := 0.0
-	for i := 0.0; i < years; i++ {
+	eps := args.Eps
+	for i := 0.0; i < args.Years; i++ {
 		div_bucket = div_bucket * (1.0 + CONST_DIV_GROWTH)
-		div_bucket = div_bucket + (eps * payout)
-		eps = eps * (1.0 + growth)
+		div_bucket = div_bucket + (eps * args.Payout)
+		eps = eps * (1.0 + args.Growth)
 	}
-	result := math.Pow(((eps*peterminal)+div_bucket)/price, 1.0/years) - 1.0
+	result := math.Pow(((eps*args.PeTerminal)+div_bucket)/args.Price, 1.0/args.Years) - 1.0
 	result = math.Round(result*100000000) / 100000000
 
 	json.NewEncoder(w).Encode(CagrRet{Cagr: result})
