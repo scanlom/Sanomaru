@@ -38,8 +38,8 @@ func setupRouter(router *mux.Router) {
 }
 
 func Config(w http.ResponseWriter, r *http.Request) {
-	log.Println("Config called...")
-	log.Println(r.URL.Query())
+	log.Println("Config: Called...")
+	log.Printf("Config: Arguments: %s", r.URL.Query())
 
 	args := new(ConfigInput)
 	decoder := schema.NewDecoder()
@@ -50,17 +50,17 @@ func Config(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Println(args.Name)
 	yamlFile, err := ioutil.ReadFile("/home/scanlom/.Sanomaru")
 	if err != nil {
-		log.Printf("~/.Sanomaru err #%v ", err)
+		log.Printf("Config: /home/scanlom/.Sanomaru err #%v ", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
 	var y Yaml
 	err = yaml.Unmarshal(yamlFile, &y)
 	if err != nil {
-		log.Printf("Unmarshal: %v", err)
+		log.Printf("Config: Unmarshal: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -69,13 +69,15 @@ func Config(w http.ResponseWriter, r *http.Request) {
 	if args.Name == "database.connect" {
 		result = y.Database.Connect
 	} else {
-		log.Printf("Unknown Name: %s", args.Name)
+		log.Printf("Config: Unknown Name: %s", args.Name)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	json.NewEncoder(w).Encode(ConfigRet{Value: result})
-	log.Println("Config complete!")
+	ret := ConfigRet{Value: result}
+	json.NewEncoder(w).Encode(ret)
+	log.Printf("Config: Returned %v", ret)
+	log.Println("Config: Complete!")
 }
 
 func main() {
