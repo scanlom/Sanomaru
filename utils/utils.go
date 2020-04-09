@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/schema"
+	"github.com/scanlom/Sanomaru/api"
 	"log"
 	"math"
 	"net/http"
 	"strings"
 )
 
-const CONST_DIV_GROWTH = 0.0981
+const CONST_DIV_GROWTH = "DIV_GROWTH"
 const CONST_CONFIDENCE_NONE = "NONE"
 const CONST_CONFIDENCE_LOW = "LOW"
 const CONST_CONFIDENCE_MEDIUM = "MEDIUM"
@@ -84,9 +85,10 @@ func Cagr(w http.ResponseWriter, r *http.Request) {
 	}
 
 	div_bucket := 0.0
+	div_growth, err := api.Scalar(CONST_DIV_GROWTH)
 	eps := args.Eps
 	for i := 0.0; i < args.Years; i++ {
-		div_bucket = div_bucket * (1.0 + CONST_DIV_GROWTH)
+		div_bucket = div_bucket * (1.0 + div_growth)
 		div_bucket = div_bucket + (eps * args.Payout)
 		eps = eps * (1.0 + args.Growth)
 	}

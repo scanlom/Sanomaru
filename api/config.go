@@ -8,10 +8,6 @@ import (
 	"net/http"
 )
 
-type JsonValue struct {
-	Value string `json:"value"`
-}
-
 func Config(name string) (string, error) {
 	log.Println("Api.Config: Called...")
 	response, err := http.Get(fmt.Sprintf("http://localhost:8082/blue-lion/config?name=%s", name))
@@ -24,7 +20,7 @@ func Config(name string) (string, error) {
 		return "", err
 	}
 
-	var val JsonValue
+	var val JsonStringValue
 	err = json.Unmarshal(data, &val)
 	if err != nil {
 		return "", err
