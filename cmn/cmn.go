@@ -28,9 +28,11 @@ func ErrorHttp(err error, w http.ResponseWriter, code int) {
 
 func DbConnect() (*sqlx.DB, error) {
 	if db != nil {
+		log.Println("DbConnect: Returned cached connection")
 		return db, nil
 	}
 
+	log.Println("DbConnect: Acquiring connection")
 	c, err := api.Config("database.connect")
 	if err != nil {
 		return nil, err

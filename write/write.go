@@ -13,6 +13,7 @@ import (
 func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/write/market-data/{id}", MarketDataByID).Methods("PUT")
 	router.HandleFunc("/blue-lion/write/market-data", MarketData).Methods("POST")
+	router.HandleFunc("/blue-lion/write/simfin-income", SimfinIncome).Methods("POST")
 }
 
 func MarketData(w http.ResponseWriter, r *http.Request) {
@@ -75,6 +76,41 @@ func MarketDataByID(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(ret)
 	cmn.Exit("MarketDataByID", ret)
+}
+
+func SimfinIncome(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Write-SimfinIncome", r.URL.Query())
+	w.Header().Set("Content-Type", "application/json")
+	var ret api.JsonSimfinIncome
+	err := json.NewDecoder(r.Body).Decode(&ret)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	db, err := cmn.DbConnect()
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	log.Println(ret)
+	_, err = db.NamedExec(api.JsonToNamedInsert(ret), ret)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	// MSTODO - How should I return db entries from a post?
+	/*err = db.Get(&ret, fmt.Sprintf("SELECT id, ref_data_id, last FROM market_data WHERE ref_data_id=%d", ret.RefDataID))
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}*/
+
+	json.NewEncoder(w).Encode(&ret)
+	cmn.Exit("Write-SimfinIncome", ret)
 }
 
 func main() {

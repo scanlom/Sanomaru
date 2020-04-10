@@ -20,8 +20,10 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/ref-data", RefDataBySymbol).Queries("symbol", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/ref-data", RefData).Methods("GET")
 
+	router.HandleFunc("/blue-lion/read/simfin-income/{id}", SimfinIncomeByID).Methods("GET")
+	router.HandleFunc("/blue-lion/read/simfin-income", SimfinIncomeByTicker).Queries("ticker", "").Methods("GET")
+
 	router.Methods("GET").Path("/blue-lion/read/scalar").HandlerFunc(Scalar)
-	router.Methods("GET").Path("/blue-lion/read/simfin-income").HandlerFunc(SimFinIncome)
 }
 
 func MarketData(w http.ResponseWriter, r *http.Request) {
@@ -228,17 +230,61 @@ func Scalar(w http.ResponseWriter, r *http.Request) {
 	cmn.Exit("Scalar", s)
 }
 
-type SimFinIncomeInput struct {
-	Symbol string `schema:"symbol"`
+func SimfinIncomeByID(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("SimfinIncomeByID", r.URL.Query())
+
+	params := mux.Vars(r)
+	id := params["id"]
+
+	db, err := cmn.DbConnect()
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	ret := api.JsonSimfinIncome{}
+	err = db.Get(&ret, api.JsonToSelect(ret)+fmt.Sprintf(" WHERE id=%s", id))
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(&ret)
+
+	cmn.Exit("RefDataByID", ret)
 }
 
-type SimFinIncomeRet struct {
-	Revenue float64 `json:"revenue"`
+type SimfinIncomeInput struct {
+	Ticker string `schema:"ticker"`
 }
 
-func SimFinIncome(w http.ResponseWriter, r *http.Request) {
-	log.Println("SimFinIncome: Called...")
-	log.Println("SimFinIncome: Complete!")
+func SimfinIncomeByTicker(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("SimfinIncomeByTicker", r.URL.Query())
+
+	args := new(SimfinIncomeInput)
+	decoder := schema.NewDecoder()
+	err := decoder.Decode(args, r.URL.Query())
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		return
+	}
+
+	db, err := cmn.DbConnect()
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	ret := []api.JsonSimfinIncome{}
+	err = db.Select(&ret, api.JsonToSelect(api.JsonSimfinIncome{})+fmt.Sprintf(" WHERE ticker='%s'", args.Ticker))
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(&ret)
+
+	cmn.Exit("SimfinIncomeByTicker", ret)
 }
 
 func main() {
