@@ -14,6 +14,8 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/write/market-data/{id}", MarketDataByID).Methods("PUT")
 	router.HandleFunc("/blue-lion/write/market-data", MarketData).Methods("POST")
 	router.HandleFunc("/blue-lion/write/simfin-income", SimfinIncome).Methods("POST")
+	router.HandleFunc("/blue-lion/write/simfin-balance", SimfinBalance).Methods("POST")
+	router.HandleFunc("/blue-lion/write/simfin-cashflow", SimfinCashflow).Methods("POST")
 }
 
 func MarketData(w http.ResponseWriter, r *http.Request) {
@@ -95,7 +97,7 @@ func SimfinIncome(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Println(ret)
-	_, err = db.NamedExec(api.JsonToNamedInsert(ret), ret)
+	_, err = db.NamedExec(api.JsonToNamedInsert(ret, "simfin_income"), ret)
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
@@ -111,6 +113,76 @@ func SimfinIncome(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(&ret)
 	cmn.Exit("Write-SimfinIncome", ret)
+}
+
+func SimfinBalance(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Write-SimfinBalance", r.URL.Query())
+	w.Header().Set("Content-Type", "application/json")
+	var ret api.JsonSimfinBalance
+	err := json.NewDecoder(r.Body).Decode(&ret)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	db, err := cmn.DbConnect()
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	log.Println(ret)
+	_, err = db.NamedExec(api.JsonToNamedInsert(ret, "simfin_balance"), ret)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	// MSTODO - How should I return db entries from a post?
+	/*err = db.Get(&ret, fmt.Sprintf("SELECT id, ref_data_id, last FROM market_data WHERE ref_data_id=%d", ret.RefDataID))
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}*/
+
+	json.NewEncoder(w).Encode(&ret)
+	cmn.Exit("Write-SimfinBalance", ret)
+}
+
+func SimfinCashflow(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Write-SimfinCashflow", r.URL.Query())
+	w.Header().Set("Content-Type", "application/json")
+	var ret api.JsonSimfinCashflow
+	err := json.NewDecoder(r.Body).Decode(&ret)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	db, err := cmn.DbConnect()
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	log.Println(ret)
+	_, err = db.NamedExec(api.JsonToNamedInsert(ret, "simfin_cashflow"), ret)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	// MSTODO - How should I return db entries from a post?
+	/*err = db.Get(&ret, fmt.Sprintf("SELECT id, ref_data_id, last FROM market_data WHERE ref_data_id=%d", ret.RefDataID))
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}*/
+
+	json.NewEncoder(w).Encode(&ret)
+	cmn.Exit("Write-SimfinCashflow", ret)
 }
 
 func main() {

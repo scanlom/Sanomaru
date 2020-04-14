@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 )
@@ -56,7 +57,89 @@ type JsonSimfinIncome struct {
 	NetIncomeCommon     int64  `json:"netIncomeCommon" db:"net_income_common"`
 }
 
-func JsonToNamedInsert(val JsonSimfinIncome) string {
+type JsonIncome struct {
+	JsonSimfinIncome
+	EPS float64 `json:"eps"`
+}
+
+type JsonSimfinBalance struct {
+	ID                int    `json:"id" db:"id"`
+	Ticker            string `json:"ticker" db:"ticker"`
+	SimfinID          int    `json:"simfinId" db:"simfin_id"`
+	CCY               string `json:"ccy" db:"currency"`
+	FiscalYear        int    `json:"fiscalYear" db:"fiscal_year"`
+	FiscalPeriod      string `json:"fiscalPeriod" db:"fiscal_period"`
+	ReportDate        string `json:"reportDate" db:"report_date"`
+	PublishDate       string `json:"publishDate" db:"publish_date"`
+	SharesBasic       int64  `json:"sharesBasic" db:"shares_basic"`
+	SharesDiluted     int64  `json:"sharesDiluted" db:"shares_diluted"`
+	CashEquivStInvest int64  `json:"cashEquivStInvest" db:"cash_equiv_st_invest"`
+	AccNotesRecv      int64  `json:"accNotesRecv" db:"acc_notes_recv"`
+	Inventories       int64  `json:"inventories" db:"inventories"`
+	TotalCurAssets    int64  `json:"totalCurAssets" db:"total_cur_assets"`
+	PropPlantEquipNet int64  `json:"propPlantEquipNet" db:"prop_plant_equip_net"`
+	LtInvestRecv      int64  `json:"ltInvestRecv" db:"lt_invest_recv"`
+	OtherLtAssets     int64  `json:"otherLtAssets" db:"other_lt_assets"`
+	TotalNoncurAssets int64  `json:"totalNoncurAssets" db:"total_noncur_assets"`
+	TotalAssets       int64  `json:"totalAssets" db:"total_assets"`
+	PayablesAccruals  int64  `json:"payablesAccruals" db:"payables_accruals"`
+	StDebt            int64  `json:"stDebt" db:"st_debt"`
+	TotalCurLiab      int64  `json:"totalCurLiab" db:"total_cur_liab"`
+	LtDebt            int64  `json:"ltDebt" db:"lt_debt"`
+	TotalNoncurLiab   int64  `json:"totalNoncurLiab" db:"total_noncur_liab"`
+	TotalLiabilities  int64  `json:"totalLiabilities" db:"total_liabilities"`
+	ShareCapitalAdd   int64  `json:"shareCapitalAdd" db:"share_capital_add"`
+	TreasuryStock     int64  `json:"treasuryStock" db:"treasury_stock"`
+	RetainedEarnings  int64  `json:"retainedEarnings" db:"retained_earnings"`
+	TotalEquity       int64  `json:"totalEquity" db:"total_equity"`
+	TotalLiabEquity   int64  `json:"totalLiabEquity" db:"total_liab_equity"`
+}
+
+type JsonBalance struct {
+	JsonSimfinBalance
+}
+
+type JsonSimfinCashflow struct {
+	ID                   int    `json:"id" db:"id"`
+	Ticker               string `json:"ticker" db:"ticker"`
+	SimfinID             int    `json:"simfinId" db:"simfin_id"`
+	CCY                  string `json:"ccy" db:"currency"`
+	FiscalYear           int    `json:"fiscalYear" db:"fiscal_year"`
+	FiscalPeriod         string `json:"fiscalPeriod" db:"fiscal_period"`
+	ReportDate           string `json:"reportDate" db:"report_date"`
+	PublishDate          string `json:"publishDate" db:"publish_date"`
+	SharesBasic          int64  `json:"sharesBasic" db:"shares_basic"`
+	SharesDiluted        int64  `json:"sharesDiluted" db:"shares_diluted"`
+	NetIncomeStart       int64  `json:"netIncomeStart" db:"net_income_start"`
+	DeprAmor             int64  `json:"deprAmor" db:"depr_amor"`
+	NonCashItems         int64  `json:"nonCashItems" db:"non_cash_items"`
+	ChgWorkingCapital    int64  `json:"chgWorkingCapital" db:"chg_working_capital"`
+	ChgAccountsRecv      int64  `json:"chgAccountsRecv" db:"chg_accounts_recv"`
+	ChgInventories       int64  `json:"chgInventories" db:"chg_inventories"`
+	ChgAccPayable        int64  `json:"chgAccPayable" db:"chg_acc_payable"`
+	ChgOther             int64  `json:"chgOther" db:"chg_other"`
+	NetCashOps           int64  `json:"netCashOps" db:"net_cash_ops"`
+	ChgFixAssetsInt      int64  `json:"chgFixAssetsInt" db:"chg_fix_assets_intcapex"`
+	NetChgLtInvest       int64  `json:"netChgLtInvest" db:"net_chg_lt_invest"`
+	NetCashAcqDivest     int64  `json:"netCashAcqDivest" db:"net_cash_acq_divest"`
+	NetCashInv           int64  `json:"netCashInv" db:"net_cash_inv"`
+	DividendsPaid        int64  `json:"dividendsPaid" db:"dividends_paid"`
+	CashRepayDebt        int64  `json:"cashRepayDebt" db:"cash_repay_debt"`
+	CashRepurchaseEquity int64  `json:"cashRepurchaseEquity" db:"cash_repurchase_equity"`
+	NetCashFin           int64  `json:"netCashFin" db:"net_cash_fin"`
+	NetChgCash           int64  `json:"netChgCash" db:"net_chg_cash"`
+}
+
+type JsonCashflow struct {
+	JsonSimfinCashflow
+}
+
+type JsonSummary struct {
+	Ticker     string  `json:"ticker"`
+	EPSCagr5yr float64 `json:"epsCagr5yr"`
+}
+
+func JsonToNamedInsert(val interface{}, table string) string {
 	var cols string
 	var params string
 	t := reflect.TypeOf(val)
@@ -69,11 +152,11 @@ func JsonToNamedInsert(val JsonSimfinIncome) string {
 	}
 	cols = strings.TrimRight(cols, ",")
 	params = strings.TrimRight(params, ",")
-	ret := "INSERT INTO simfin_income (" + cols + ") VALUES (" + params + ")"
+	ret := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", table, cols, params)
 	return ret
 }
 
-func JsonToSelect(val JsonSimfinIncome) string {
+func JsonToSelect(val interface{}, table string) string {
 	var cols string
 	t := reflect.TypeOf(val)
 	for i := 0; i < t.NumField(); i++ {
@@ -81,6 +164,6 @@ func JsonToSelect(val JsonSimfinIncome) string {
 		cols += tag + ","
 	}
 	cols = strings.TrimRight(cols, ",")
-	ret := "SELECT " + cols + " FROM simfin_income"
+	ret := fmt.Sprintf("SELECT %s FROM %s", cols, table)
 	return ret
 }

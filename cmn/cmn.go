@@ -5,6 +5,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/scanlom/Sanomaru/api"
 	"log"
+	"math"
 	"net/http"
 )
 
@@ -39,4 +40,8 @@ func DbConnect() (*sqlx.DB, error) {
 	}
 	db, err = sqlx.Connect("postgres", c)
 	return db, err
+}
+
+func Round(x, unit float64) float64 {
+	return math.Round(x/unit) * unit
 }
