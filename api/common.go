@@ -26,6 +26,20 @@ type JsonMarketData struct {
 	Last      float64 `json:"last" db:"last"`
 }
 
+type JsonMarketDataHistorical struct {
+	ID        int     `json:"id" db:"id"`
+	Date      string  `json:"date" db:"date"`
+	RefDataID int     `json:"refDataId" db:"ref_data_id"`
+	AdjClose  float64 `json:"adjClose" db:"adj_close"`
+	Close     float64 `json:"close" db:"close"`
+}
+
+type JsonMDHYearSummary struct {
+	RefDataID int     `json:"refDataId" db:"ref_data_id"`
+	High      float64 `json:"high" db:"high"`
+	Low       float64 `json:"low" db:"low"`
+}
+
 type JsonSimfinIncome struct {
 	ID                  int    `json:"id" db:"id"`
 	Ticker              string `json:"ticker" db:"ticker"`
@@ -132,11 +146,26 @@ type JsonSimfinCashflow struct {
 
 type JsonCashflow struct {
 	JsonSimfinCashflow
+	DPS float64 `json:"dps"`
+}
+
+type JsonHeadline struct {
+	Ticker       string  `json:"ticker"`
+	EPSCagr5yr   float64 `json:"epsCagr5yr"`
+	EPSCagr10yr  float64 `json:"epsCagr10yr"`
+	PEHighMMO5yr int     `json:"peHighMmo5yr"`
+	PELowMMO5yr  int     `json:"peLowMmo5yr"`
 }
 
 type JsonSummary struct {
-	Ticker     string  `json:"ticker"`
-	EPSCagr5yr float64 `json:"epsCagr5yr"`
+	ReportDate string  `json:"reportDate"`
+	EPS        float64 `json:"eps"`
+	DPS        float64 `json:"dps"`
+	PEHigh     int     `json:"peHigh"`
+	PELow      int     `json:"peLow"`
+	ROE        float64 `json:"roe"`
+	ROA        float64 `json:"roa"`
+	MarketCap  int64   `json:"marketCap"`
 }
 
 func JsonToNamedInsert(val interface{}, table string) string {

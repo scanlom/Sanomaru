@@ -9,6 +9,19 @@ import (
 	"net/http"
 )
 
+type RestSymbolInput struct {
+	Symbol string `schema:"symbol"`
+}
+
+type RestTickerInput struct {
+	Ticker string `schema:"ticker"`
+}
+
+type RestSymbolDateInput struct {
+	Symbol string `schema:"symbol"`
+	Date   string `schema:"date"`
+}
+
 var db *sqlx.DB
 
 func Enter(name string, args interface{}) {

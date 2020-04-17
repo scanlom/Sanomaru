@@ -16,6 +16,7 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/market-data/{id}", MarketDataByID).Methods("GET")
 	router.HandleFunc("/blue-lion/read/market-data", MarketDataBySymbol).Queries("symbol", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/market-data", MarketData).Methods("GET")
+	router.HandleFunc("/blue-lion/read/market-data-historical/year-summary", MDHYearSummaryBySymbol).Queries("symbol", "").Methods("GET")
 
 	router.HandleFunc("/blue-lion/read/ref-data/{id}", RefDataByID).Methods("GET")
 	router.HandleFunc("/blue-lion/read/ref-data", RefDataBySymbol).Queries("symbol", "").Methods("GET")
@@ -31,6 +32,7 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/simfin-cashflow", SimfinCashflowByTicker).Queries("ticker", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/cashflow", CashflowByTicker).Queries("ticker", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/summary", SummaryByTicker).Queries("ticker", "").Methods("GET")
+	router.HandleFunc("/blue-lion/read/headline", HeadlineByTicker).Queries("ticker", "").Methods("GET")
 
 	router.Methods("GET").Path("/blue-lion/read/scalar").HandlerFunc(Scalar)
 }
@@ -80,14 +82,10 @@ func MarketDataByID(w http.ResponseWriter, r *http.Request) {
 	cmn.Exit("MarketDataByID", ret)
 }
 
-type MarketDataInput struct {
-	Symbol string `schema:"symbol"`
-}
-
 func MarketDataBySymbol(w http.ResponseWriter, r *http.Request) {
 	cmn.Enter("MarketDataBySymbol", r.URL.Query())
 
-	args := new(MarketDataInput)
+	args := new(cmn.RestSymbolInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
@@ -117,6 +115,43 @@ func MarketDataBySymbol(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(&ret)
 
 	cmn.Exit("MarketDataBySymbol", ret)
+}
+
+func MDHYearSummaryBySymbol(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-MDHYearSummaryBySymbol", r.URL.Query())
+
+	args := new(cmn.RestSymbolDateInput)
+	decoder := schema.NewDecoder()
+	err := decoder.Decode(args, r.URL.Query())
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		return
+	}
+
+	refDataID, err := api.SymbolToRefDataID(args.Symbol)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	db, err := cmn.DbConnect()
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	ret := api.JsonMDHYearSummary{}
+	err = db.Get(&ret, fmt.Sprintf("SELECT ref_data_id, MAX(close) AS high, MIN(close) AS low FROM  market_data_historical "+
+		"WHERE ref_data_id=%d AND date<='%s' and date > TO_DATE('%s','YYYY-MM-DD') - INTERVAL '1 year' "+
+		"GROUP BY ref_data_id", refDataID, args.Date, args.Date))
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(&ret)
+
+	cmn.Exit("Read-MDHYearSummaryBySymbol", ret)
 }
 
 func RefData(w http.ResponseWriter, r *http.Request) {
@@ -510,7 +545,7 @@ func CashflowByTicker(w http.ResponseWriter, r *http.Request) {
 	ret := []api.JsonCashflow{}
 	for s := range simfin {
 		i := api.JsonCashflow{JsonSimfinCashflow: simfin[s]}
-		//i.EPS = cmn.Round(float64(i.NetIncome)/float64(i.SharesDiluted), 0.01)
+		i.DPS = -1.0 * cmn.Round(float64(i.DividendsPaid)/float64(i.SharesDiluted), 0.01)
 		ret = append(ret, i)
 	}
 	json.NewEncoder(w).Encode(&ret)
@@ -518,15 +553,74 @@ func CashflowByTicker(w http.ResponseWriter, r *http.Request) {
 	cmn.Exit("CashflowByTicker", ret)
 }
 
-type SummaryInput struct {
+type HeadlineInput struct {
 	Ticker string `schema:"ticker"`
 }
 
-func SummaryByTicker(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("SummaryByTicker", r.URL.Query())
+func HeadlineByTicker(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-HeadlineByTicker", r.URL.Query())
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	args := new(SummaryInput)
+	args := new(HeadlineInput)
+	decoder := schema.NewDecoder()
+	err := decoder.Decode(args, r.URL.Query())
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		return
+	}
+
+	var summary []api.JsonSummary
+	err = api.SummaryByTicker(args.Ticker, &summary)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var epsCagr5yr, epsCagr10yr float64
+	var peHighMmo5yr, peLowMmo5yr int
+	var sumH, sumL, maxH, maxL, minH, minL int
+	minH = math.MaxInt64
+	minL = math.MaxInt64
+	if len(summary) > 5 {
+		epsCagr5yr = math.Pow(summary[0].EPS/summary[5].EPS, 0.2) - 1.0
+	}
+	if len(summary) > 10 {
+		epsCagr10yr = math.Pow(summary[0].EPS/summary[10].EPS, 0.1) - 1.0
+	}
+
+	if len(summary) >= 5 {
+		for i := 0; i < 5; i++ {
+			if summary[i].PEHigh > maxH {
+				maxH = summary[i].PEHigh
+			}
+			if summary[i].PELow > maxL {
+				maxL = summary[i].PELow
+			}
+			if summary[i].PEHigh < minH {
+				minH = summary[i].PEHigh
+			}
+			if summary[i].PELow < minL {
+				minL = summary[i].PELow
+			}
+			sumH += summary[i].PEHigh
+			sumL += summary[i].PELow
+		}
+		peHighMmo5yr = int(math.Round(float64(sumH-maxH-minH) / 3.0))
+		peLowMmo5yr = int(math.Round(float64(sumL-maxL-minL) / 3.0))
+	}
+
+	ret := []api.JsonHeadline{api.JsonHeadline{Ticker: args.Ticker, EPSCagr5yr: epsCagr5yr, EPSCagr10yr: epsCagr10yr, PEHighMMO5yr: peHighMmo5yr, PELowMMO5yr: peLowMmo5yr}}
+	json.NewEncoder(w).Encode(&ret)
+
+	cmn.Exit("Read-HeadlineByTicker", ret)
+}
+
+func SummaryByTicker(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-SummaryByTicker", r.URL.Query())
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	args := new(cmn.RestTickerInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
@@ -542,15 +636,49 @@ func SummaryByTicker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var epsCagr5yr float64
-	if len(income) > 5 {
-		epsCagr5yr = math.Pow(income[0].EPS/income[6].EPS, 0.2) - 1.0
+	var balance []api.JsonBalance
+	err = api.BalanceByTicker(args.Ticker, &balance)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
-	ret := []api.JsonSummary{api.JsonSummary{Ticker: args.Ticker, EPSCagr5yr: epsCagr5yr}}
+	var cashflow []api.JsonCashflow
+	err = api.CashflowByTicker(args.Ticker, &cashflow)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	ret := []api.JsonSummary{}
+	for i := range income {
+		var mdhYearSummary api.JsonMDHYearSummary
+		err = api.MDHYearSummaryBySymbol(args.Ticker, income[i].ReportDate, &mdhYearSummary)
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		s := api.JsonSummary{}
+		s.ReportDate = income[i].ReportDate
+		s.EPS = income[i].EPS
+		s.DPS = cashflow[i].DPS
+		if s.EPS != 0.0 {
+			s.PEHigh = int(math.Round(mdhYearSummary.High / s.EPS))
+			s.PELow = int(math.Round(mdhYearSummary.Low / s.EPS))
+		}
+		// For ROE and ROA, need to make sure we're not on the last year
+		if i < len(income)-1 {
+			s.ROE = float64(income[i].NetIncome) / (float64(balance[i].TotalEquity+balance[i+1].TotalEquity) / 2.0)
+			s.ROA = float64(income[i].NetIncome) / (float64(balance[i].TotalAssets+balance[i+1].TotalAssets) / 2.0)
+		}
+		ret = append(ret, s)
+	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("SummaryByTicker", ret)
+	cmn.Exit("Read-SummaryByTicker", ret)
 }
 
 func main() {

@@ -52,9 +52,9 @@ func SymbolToRefDataID(symbol string) (int, error) {
 	return ret.ID, nil
 }
 
-func RestSliceByString(msg string, urlFmt string, slice interface{}, param string) error {
+func RestGetByUrl(msg string, url string, ret interface{}) error {
 	log.Printf("Api.%s: Called...", msg)
-	response, err := http.Get(fmt.Sprintf(urlFmt, param))
+	response, err := http.Get(url)
 	if err != nil {
 		return err
 	}
@@ -64,7 +64,7 @@ func RestSliceByString(msg string, urlFmt string, slice interface{}, param strin
 		return err
 	}
 
-	err = json.Unmarshal(data, slice)
+	err = json.Unmarshal(data, ret)
 	if err != nil {
 		return err
 	}
@@ -73,50 +73,58 @@ func RestSliceByString(msg string, urlFmt string, slice interface{}, param strin
 	return nil
 }
 
+func MDHYearSummaryBySymbol(symbol string, date string, ret *JsonMDHYearSummary) error {
+	return RestGetByUrl("MDHYearSummaryBySymbol",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/market-data-historical/year-summary?symbol=%s&date=%s", symbol, date),
+		ret,
+	)
+}
+
 func SimfinIncomeByTicker(ticker string, slice *[]JsonSimfinIncome) error {
-	return RestSliceByString("SimfinIncomeByTicker",
-		"http://localhost:8081/blue-lion/read/simfin-income?ticker=%s",
+	return RestGetByUrl("SimfinIncomeByTicker",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/simfin-income?ticker=%s", ticker),
 		slice,
-		ticker,
 	)
 }
 
 func IncomeByTicker(ticker string, slice *[]JsonIncome) error {
-	return RestSliceByString("IncomeByTicker",
-		"http://localhost:8081/blue-lion/read/income?ticker=%s",
+	return RestGetByUrl("IncomeByTicker",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/income?ticker=%s", ticker),
 		slice,
-		ticker,
 	)
 }
 
 func SimfinBalanceByTicker(ticker string, slice *[]JsonSimfinBalance) error {
-	return RestSliceByString("SimfinBalanceByTicker",
-		"http://localhost:8081/blue-lion/read/simfin-balance?ticker=%s",
+	return RestGetByUrl("SimfinBalanceByTicker",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/simfin-balance?ticker=%s", ticker),
 		slice,
-		ticker,
 	)
 }
 
 func BalanceByTicker(ticker string, slice *[]JsonBalance) error {
-	return RestSliceByString("BalanceByTicker",
-		"http://localhost:8081/blue-lion/read/balance?ticker=%s",
+	return RestGetByUrl("BalanceByTicker",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/balance?ticker=%s", ticker),
 		slice,
-		ticker,
 	)
 }
 
 func SimfinCashflowByTicker(ticker string, slice *[]JsonSimfinCashflow) error {
-	return RestSliceByString("SimfinCashflowByTicker",
-		"http://localhost:8081/blue-lion/read/simfin-cashflow?ticker=%s",
+	return RestGetByUrl("SimfinCashflowByTicker",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/simfin-cashflow?ticker=%s", ticker),
 		slice,
-		ticker,
 	)
 }
 
 func CashflowByTicker(ticker string, slice *[]JsonCashflow) error {
-	return RestSliceByString("CashflowByTicker",
-		"http://localhost:8081/blue-lion/read/cashflow?ticker=%s",
+	return RestGetByUrl("CashflowByTicker",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/cashflow?ticker=%s", ticker),
 		slice,
-		ticker,
+	)
+}
+
+func SummaryByTicker(ticker string, slice *[]JsonSummary) error {
+	return RestGetByUrl("SummaryByTicker",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/summary?ticker=%s", ticker),
+		slice,
 	)
 }
