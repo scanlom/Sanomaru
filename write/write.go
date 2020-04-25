@@ -17,12 +17,16 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/write/market-data-historical", MarketDataHistorical).Methods("POST")
 	router.HandleFunc("/blue-lion/write/market-data-historical", MarketDataHistoricalBySymbolDelete).Queries("symbol", "").Methods("DELETE")
 	router.HandleFunc("/blue-lion/write/simfin-income", SimfinIncome).Methods("POST")
+	router.HandleFunc("/blue-lion/write/simfin-income/{id}", SimfinIncomeByIDDelete).Methods("DELETE")
 	router.HandleFunc("/blue-lion/write/simfin-balance", SimfinBalance).Methods("POST")
+	router.HandleFunc("/blue-lion/write/simfin-balance/{id}", SimfinBalanceByIDDelete).Methods("DELETE")
 	router.HandleFunc("/blue-lion/write/simfin-cashflow", SimfinCashflow).Methods("POST")
+	router.HandleFunc("/blue-lion/write/simfin-cashflow/{id}", SimfinCashflowByIDDelete).Methods("DELETE")
 }
 
 func RestHandlePost(w http.ResponseWriter, r *http.Request, msg string, ptr interface{}, obj interface{}, table string) {
 	cmn.Enter(msg, r.URL.Query())
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 	err := json.NewDecoder(r.Body).Decode(ptr)
 	if err != nil {
@@ -46,6 +50,27 @@ func RestHandlePost(w http.ResponseWriter, r *http.Request, msg string, ptr inte
 	cmn.Exit(msg, ptr)
 }
 
+func RestHandleDelete(w http.ResponseWriter, r *http.Request, msg string, table string) {
+	cmn.Enter(msg, r.URL.Query())
+	params := mux.Vars(r)
+	id := params["id"]
+
+	db, err := cmn.DbConnect()
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	_, err = db.Exec(fmt.Sprintf("DELETE FROM %s where id=%s", table, id))
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	cmn.Exit(msg, http.StatusOK)
+}
+
 func MarketData(w http.ResponseWriter, r *http.Request) {
 	var ret api.JsonMarketData
 	RestHandlePost(w, r, "Write-MarketData", &ret, ret, "market_data")
@@ -54,6 +79,7 @@ func MarketData(w http.ResponseWriter, r *http.Request) {
 func MarketDataByID(w http.ResponseWriter, r *http.Request) {
 	cmn.Enter("MarketDataByID", r.URL.Query())
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	params := mux.Vars(r)
 	id := params["id"]
 
@@ -125,9 +151,17 @@ func SimfinIncome(w http.ResponseWriter, r *http.Request) {
 	RestHandlePost(w, r, "Write-SimfinIncome", &ret, ret, "simfin_income")
 }
 
+func SimfinIncomeByIDDelete(w http.ResponseWriter, r *http.Request) {
+	RestHandleDelete(w, r, "Write-SimfinIncomeByIDDelete", "simfin_income")
+}
+
 func SimfinBalance(w http.ResponseWriter, r *http.Request) {
 	var ret api.JsonSimfinBalance
 	RestHandlePost(w, r, "Write-SimfinBalance", &ret, ret, "simfin_balance")
+}
+
+func SimfinBalanceByIDDelete(w http.ResponseWriter, r *http.Request) {
+	RestHandleDelete(w, r, "Write-SimfinBalanceByIDDelete", "simfin_balance")
 }
 
 func SimfinCashflow(w http.ResponseWriter, r *http.Request) {
@@ -135,8 +169,12 @@ func SimfinCashflow(w http.ResponseWriter, r *http.Request) {
 	RestHandlePost(w, r, "Write-SimfinCashflow", &ret, ret, "simfin_cashflow")
 }
 
+func SimfinCashflowByIDDelete(w http.ResponseWriter, r *http.Request) {
+	RestHandleDelete(w, r, "Write-SimfinCashflowByIDDelete", "simfin_cashflow")
+}
+
 func main() {
 	router := mux.NewRouter().StrictSlash(true)
 	setupRouter(router)
-	log.Fatal(http.ListenAndServe(":8083", router))
+	log.Fatal(http.ListenAndServe(":8083", cmn.CorsMiddleware(router)))
 }

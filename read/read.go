@@ -658,8 +658,7 @@ func SummaryByTicker(w http.ResponseWriter, r *http.Request) {
 		err = api.MDHYearSummaryBySymbol(args.Ticker, income[i].ReportDate, &mdhYearSummary)
 		if err != nil {
 			log.Println(err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
+			// continue on, it's ok if we can't get historical market data
 		}
 		s := api.JsonSummary{}
 		s.ReportDate = income[i].ReportDate

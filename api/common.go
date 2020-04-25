@@ -69,6 +69,7 @@ type JsonSimfinIncome struct {
 	NetExtrGainLoss     int64  `json:"netExtrGainLoss" db:"net_extr_gain_loss"`
 	NetIncome           int64  `json:"netIncome" db:"net_income"`
 	NetIncomeCommon     int64  `json:"netIncomeCommon" db:"net_income_common"`
+	EntryType           string `json:"entryType" db:"entry_type"`
 }
 
 type JsonIncome struct {
@@ -107,6 +108,7 @@ type JsonSimfinBalance struct {
 	RetainedEarnings  int64  `json:"retainedEarnings" db:"retained_earnings"`
 	TotalEquity       int64  `json:"totalEquity" db:"total_equity"`
 	TotalLiabEquity   int64  `json:"totalLiabEquity" db:"total_liab_equity"`
+	EntryType         string `json:"entryType" db:"entry_type"`
 }
 
 type JsonBalance struct {
@@ -142,6 +144,7 @@ type JsonSimfinCashflow struct {
 	CashRepurchaseEquity int64  `json:"cashRepurchaseEquity" db:"cash_repurchase_equity"`
 	NetCashFin           int64  `json:"netCashFin" db:"net_cash_fin"`
 	NetChgCash           int64  `json:"netChgCash" db:"net_chg_cash"`
+	EntryType            string `json:"entryType" db:"entry_type"`
 }
 
 type JsonCashflow struct {
