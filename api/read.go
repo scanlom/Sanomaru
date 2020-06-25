@@ -8,9 +8,11 @@ import (
 	"net/http"
 )
 
+const CONST_DIV_GROWTH = "DIV_GROWTH"
+
 func Scalar(name string) (float64, error) {
 	log.Println("Api.Scalar: Called...")
-	response, err := http.Get(fmt.Sprintf("http://localhost:8082/blue-lion/config?name=%s", name))
+	response, err := http.Get(fmt.Sprintf("http://localhost:8081/blue-lion/read/scalar?name=%s", name))
 	if err != nil {
 		return 0.0, err
 	}
@@ -126,5 +128,26 @@ func SummaryByTicker(ticker string, slice *[]JsonSummary) error {
 	return RestGetByUrl("SummaryByTicker",
 		fmt.Sprintf("http://localhost:8081/blue-lion/read/summary?ticker=%s", ticker),
 		slice,
+	)
+}
+
+func RefDataBySymbol(symbol string, ret *JsonRefData) error {
+	return RestGetByUrl("RefDataBySymbol",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/ref-data?symbol=%s", symbol),
+		ret,
+	)
+}
+
+func ProjectionsBySymbol(symbol string, ret *JsonProjections) error {
+	return RestGetByUrl("ProjectionsBySymbol",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/projections?symbol=%s", symbol),
+		ret,
+	)
+}
+
+func MarketDataBySymbol(symbol string, ret *JsonMarketData) error {
+	return RestGetByUrl("MarketDataBySymbol",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/market-data?symbol=%s", symbol),
+		ret,
 	)
 }

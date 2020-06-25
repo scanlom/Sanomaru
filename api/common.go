@@ -18,6 +18,11 @@ type JsonRefData struct {
 	ID                 int    `json:"id" db:"id"`
 	Symbol             string `json:"symbol" db:"symbol"`
 	SymbolAlphaVantage string `json:"symbolAlphaVantage" db:"symbol_alpha_vantage"`
+	Description        string `json:"description" db:"description"`
+	Sector             string `json:"sector" db:"sector"`
+	Industry           string `json:"industry" db:"industry"`
+	Active             bool   `json:"active" db:"active"`
+	Focus              bool   `json:"focus" db:"focus"`
 }
 
 type JsonMarketData struct {
@@ -34,10 +39,26 @@ type JsonMarketDataHistorical struct {
 	Close     float64 `json:"close" db:"close"`
 }
 
+type JsonProjections struct {
+	ID         int     `json:"id" db:"id"`
+	RefDataID  int     `json:"refDataId" db:"ref_data_id"`
+	Date       string  `json:"date" db:"date"`
+	EPS        float64 `json:"eps" db:"eps"`
+	DPS        float64 `json:"dps" db:"dps"`
+	Growth     float64 `json:"growth" db:"growth"`
+	PETerminal float64 `json:"peTerminal" db:"pe_terminal"`
+	Payout     float64 `json:"payout" db:"payout"`
+	Book       float64 `json:"book" db:"book"`
+	ROE        float64 `json:"roe" db:"roe"`
+	EPSYr1     float64 `json:"epsYr1" db:"eps_yr1"`
+	EPSYr2     float64 `json:"epsYr2" db:"eps_yr2"`
+}
+
 type JsonMDHYearSummary struct {
 	RefDataID int     `json:"refDataId" db:"ref_data_id"`
 	High      float64 `json:"high" db:"high"`
 	Low       float64 `json:"low" db:"low"`
+	Close     float64 `json:"close" db:"close"`
 }
 
 type JsonSimfinIncome struct {
@@ -153,22 +174,42 @@ type JsonCashflow struct {
 }
 
 type JsonHeadline struct {
-	Ticker       string  `json:"ticker"`
+	// Ref Data
+	Ticker      string  `json:"ticker"`
+	Description string  `json:"description"`
+	Sector      string  `json:"sector"`
+	Industry    string  `json:"industry"`
+	Price       float64 `json:"price"`
+	// Derived - Financials
 	EPSCagr5yr   float64 `json:"epsCagr5yr"`
 	EPSCagr10yr  float64 `json:"epsCagr10yr"`
 	PEHighMMO5yr int     `json:"peHighMmo5yr"`
 	PELowMMO5yr  int     `json:"peLowMmo5yr"`
+	ROE5yr       float64 `json:"roe5yr"`
+	// Derived - Projections
+	PE            float64 `json:"pe"`
+	EPSCagr2yr    float64 `json:"epsCagr2yr"`
+	EPSCagr7yr    float64 `json:"epsCagr7yr"`
+	DivPlusGrowth float64 `json:"divPlusGrowth"`
+	EPSYield      float64 `json:"epsYield"`
+	DPSYield      float64 `json:"dpsYield"`
+	CAGR5yr       float64 `json:"cagr5yr"`
+	CAGR10yr      float64 `json:"cagr10yr"`
+	CROE5yr       float64 `json:"croe5yr"`
+	CROE10yr      float64 `json:"croe10yr"`
+	Magic         float64 `json:"magic"`
 }
 
 type JsonSummary struct {
-	ReportDate string  `json:"reportDate"`
-	EPS        float64 `json:"eps"`
-	DPS        float64 `json:"dps"`
-	PEHigh     int     `json:"peHigh"`
-	PELow      int     `json:"peLow"`
-	ROE        float64 `json:"roe"`
-	ROA        float64 `json:"roa"`
-	MarketCap  int64   `json:"marketCap"`
+	ReportDate    string  `json:"reportDate"`
+	EPS           float64 `json:"eps"`
+	DPS           float64 `json:"dps"`
+	PEHigh        int     `json:"peHigh"`
+	PELow         int     `json:"peLow"`
+	ROE           float64 `json:"roe"`
+	ROA           float64 `json:"roa"`
+	MarketCap     int64   `json:"marketCap"`
+	SharesDiluted int64   `json:"sharesDiluted" db:"shares_diluted"`
 }
 
 func JsonToNamedInsert(val interface{}, table string) string {
@@ -185,6 +226,20 @@ func JsonToNamedInsert(val interface{}, table string) string {
 	cols = strings.TrimRight(cols, ",")
 	params = strings.TrimRight(params, ",")
 	ret := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", table, cols, params)
+	return ret
+}
+
+func JsonToNamedUpdate(val interface{}, table string) string {
+	var update string
+	t := reflect.TypeOf(val)
+	for i := 0; i < t.NumField(); i++ {
+		tag := t.Field(i).Tag.Get("db")
+		if tag != "id" {
+			update += tag + "=:" + tag + ","
+		}
+	}
+	update = strings.TrimRight(update, ",")
+	ret := fmt.Sprintf("UPDATE %s SET %s", table, update)
 	return ret
 }
 

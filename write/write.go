@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
-	"github.com/gorilla/schema"
 	"github.com/scanlom/Sanomaru/api"
 	"github.com/scanlom/Sanomaru/cmn"
 	"log"
@@ -15,7 +14,11 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/write/market-data/{id}", MarketDataByID).Methods("PUT")
 	router.HandleFunc("/blue-lion/write/market-data", MarketData).Methods("POST")
 	router.HandleFunc("/blue-lion/write/market-data-historical", MarketDataHistorical).Methods("POST")
-	router.HandleFunc("/blue-lion/write/market-data-historical", MarketDataHistoricalBySymbolDelete).Queries("symbol", "").Methods("DELETE")
+	router.HandleFunc("/blue-lion/write/market-data-historical/{id}", MarketDataHistoricalByID).Methods("PUT")
+	router.HandleFunc("/blue-lion/write/ref-data/{id}", RefDataByID).Methods("PUT")
+	router.HandleFunc("/blue-lion/write/ref-data", RefData).Methods("POST")
+	router.HandleFunc("/blue-lion/write/projections/{id}", ProjectionsByID).Methods("PUT")
+	router.HandleFunc("/blue-lion/write/projections", Projections).Methods("POST")
 	router.HandleFunc("/blue-lion/write/simfin-income", SimfinIncome).Methods("POST")
 	router.HandleFunc("/blue-lion/write/simfin-income/{id}", SimfinIncomeByIDDelete).Methods("DELETE")
 	router.HandleFunc("/blue-lion/write/simfin-balance", SimfinBalance).Methods("POST")
@@ -34,6 +37,7 @@ func RestHandlePost(w http.ResponseWriter, r *http.Request, msg string, ptr inte
 		return
 	}
 
+	cmn.LogPost(msg, ptr)
 	db, err := cmn.DbConnect()
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
@@ -41,6 +45,34 @@ func RestHandlePost(w http.ResponseWriter, r *http.Request, msg string, ptr inte
 	}
 
 	_, err = db.NamedExec(api.JsonToNamedInsert(obj, table), ptr)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(ptr)
+	cmn.Exit(msg, ptr)
+}
+
+func RestHandlePut(w http.ResponseWriter, r *http.Request, msg string, ptr interface{}, obj interface{}, table string) {
+	cmn.Enter(msg, r.URL.Query())
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+	id := params["id"]
+	err := json.NewDecoder(r.Body).Decode(ptr)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	db, err := cmn.DbConnect()
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	_, err = db.NamedExec(fmt.Sprintf("%s WHERE id=%s", api.JsonToNamedUpdate(obj, table), id), ptr)
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
@@ -112,38 +144,32 @@ func MarketDataHistorical(w http.ResponseWriter, r *http.Request) {
 	RestHandlePost(w, r, "Write-MarketDataHistorical", &ret, ret, "market_data_historical")
 }
 
-func MarketDataHistoricalBySymbolDelete(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Write-MarketDataHistoricalBySymbolDelete", r.URL.Query())
+func MarketDataHistoricalByID(w http.ResponseWriter, r *http.Request) {
+	var ret api.JsonMarketDataHistorical
+	log.Println(ret)
+	RestHandlePut(w, r, "Write-MarketDataHistoricalByID", &ret, ret, "market_data_historical")
+}
 
-	args := new(cmn.RestSymbolInput)
-	decoder := schema.NewDecoder()
-	err := decoder.Decode(args, r.URL.Query())
-	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
-		return
-	}
+func RefData(w http.ResponseWriter, r *http.Request) {
+	var ret api.JsonRefData
+	RestHandlePost(w, r, "Write-RefData", &ret, ret, "ref_data")
+}
 
-	refDataID, err := api.SymbolToRefDataID(args.Symbol)
-	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
-		return
-	}
+func RefDataByID(w http.ResponseWriter, r *http.Request) {
+	var ret api.JsonRefData
+	log.Println(ret)
+	RestHandlePut(w, r, "Write-RefDataByID", &ret, ret, "ref_data")
+}
 
-	db, err := cmn.DbConnect()
-	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
-		return
-	}
+func Projections(w http.ResponseWriter, r *http.Request) {
+	var ret api.JsonProjections
+	RestHandlePost(w, r, "Write-Projections", &ret, ret, "projections")
+}
 
-	_, err = db.Exec(fmt.Sprintf("DELETE FROM market_data_historical where ref_data_id=%d", refDataID))
-	if err != nil {
-		log.Println(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-
-	cmn.Exit("Write-MarketDataHistoricalBySymbolDelete", http.StatusOK)
+func ProjectionsByID(w http.ResponseWriter, r *http.Request) {
+	var ret api.JsonProjections
+	log.Println(ret)
+	RestHandlePut(w, r, "Write-ProjectionsByID", &ret, ret, "projections")
 }
 
 func SimfinIncome(w http.ResponseWriter, r *http.Request) {

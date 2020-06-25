@@ -22,6 +22,11 @@ type RestSymbolDateInput struct {
 	Date   string `schema:"date"`
 }
 
+type RestRefDataIDDateInput struct {
+	RefDataID int    `schema:"refDataId"`
+	Date      string `schema:"date"`
+}
+
 var db *sqlx.DB
 
 func Enter(name string, args interface{}) {
@@ -32,6 +37,10 @@ func Enter(name string, args interface{}) {
 func Exit(name string, ret interface{}) {
 	log.Printf("%s: Returned %v", name, ret)
 	log.Printf("%s: Complete!", name)
+}
+
+func LogPost(name string, ret interface{}) {
+	log.Printf("%s: Received %v", name, ret)
 }
 
 func ErrorHttp(err error, w http.ResponseWriter, code int) {
