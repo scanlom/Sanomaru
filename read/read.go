@@ -100,8 +100,65 @@ func RestHandleGetBySymbol(w http.ResponseWriter, r *http.Request, msg string, p
 }
 
 func ProjectionsBySymbol(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-ProjectionsBySymbol", r.URL.Query())
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/json")
+
+	args := new(cmn.RestSymbolInput)
+	decoder := schema.NewDecoder()
+	err := decoder.Decode(args, r.URL.Query())
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		return
+	}
+
+	refDataID, err := api.SymbolToRefDataID(args.Symbol)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	db, err := cmn.DbConnect()
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
 	var ret api.JsonProjections
-	RestHandleGetBySymbol(w, r, "Read-ProjectionsBySymbol", &ret, ret, "projections")
+	err = db.Get(&ret, fmt.Sprintf("%s WHERE ref_data_id=%d", api.JsonToSelect(ret, "projections"), refDataID))
+	if err != nil {
+		log.Println(err)
+		ret.EntryType = "D"
+
+		var summary []api.JsonSummary
+		err = api.SummaryByTicker(args.Symbol, &summary)
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if len(summary) > 0 {
+			ret.Date = summary[0].ReportDate
+			ret.EPS = summary[0].EPS
+			ret.DPS = summary[0].DPS
+			ret.Payout = ret.DPS / ret.EPS
+
+			var epsCagr5yr, epsCagr10yr, roe5yr float64
+			var peHighMmo5yr, peLowMmo5yr int
+			HeadlineFromSummary(summary, &peHighMmo5yr, &peLowMmo5yr, &epsCagr5yr, &epsCagr10yr, &roe5yr)
+			ret.Growth = epsCagr5yr
+			ret.ROE = roe5yr
+			ret.PETerminal = (peHighMmo5yr + peLowMmo5yr) / 2
+			ret.EPSYr1 = ret.EPS * (1.0 + epsCagr5yr)
+			ret.EPSYr2 = ret.EPSYr1 * (1.0 + epsCagr5yr)
+		}
+	} else {
+		ret.EntryType = "O"
+	}
+
+	json.NewEncoder(w).Encode(&ret)
+	cmn.Exit("Read-ProjectionsBySymbol", &ret)
 }
 
 func ProjectionsByID(w http.ResponseWriter, r *http.Request) {
@@ -684,6 +741,9 @@ type HeadlineInput struct {
 }
 
 func Cagr(years float64, projections api.JsonProjections, md api.JsonMarketData) float64 {
+	if projections.EPS <= 0.0 || projections.Growth <= 0.0 || projections.PETerminal <= 0.0 || md.Last <= 0.0 {
+		return 0.0
+	}
 	divBucket := 0.0
 	divGrowth, _ := api.Scalar(api.CONST_DIV_GROWTH)
 	eps := projections.EPS
@@ -694,8 +754,46 @@ func Cagr(years float64, projections api.JsonProjections, md api.JsonMarketData)
 		eps = eps * (1.0 + projections.Growth)
 		log.Printf("YR %d, EPS %f, DB %f", i, eps, divBucket)
 	}
-	ret := math.Pow(((eps*projections.PETerminal)+divBucket)/md.Last, 1.0/years) - 1.0
+	ret := math.Pow(((eps*float64(projections.PETerminal))+divBucket)/md.Last, 1.0/years) - 1.0
 	return math.Round(ret*100000000) / 100000000
+}
+
+func HeadlineFromSummary(summary []api.JsonSummary, peHighMmo5yr *int, peLowMmo5yr *int, epsCagr5yr *float64, epsCagr10yr *float64, roe5yr *float64) {
+	var sumRoe5yr float64
+	var sumH, sumL, maxH, maxL, minH, minL int
+	minH = math.MaxInt64
+	minL = math.MaxInt64
+	if len(summary) > 6 && summary[0].EPS > 0.0 && summary[1].EPS > 0.0 && summary[5].EPS > 0.0 && summary[6].EPS > 0.0 {
+		first := ((summary[5].EPS + summary[6].EPS) / 2.0)
+		last := ((summary[0].EPS + summary[1].EPS) / 2.0)
+		*epsCagr5yr = math.Pow(last/first, 0.2) - 1.0
+	}
+	if len(summary) > 10 && summary[0].EPS > 0.0 && summary[10].EPS > 0.0 {
+		*epsCagr10yr = math.Pow(summary[0].EPS/summary[10].EPS, 0.1) - 1.0
+	}
+
+	if len(summary) > 4 {
+		for i := 0; i < 5; i++ {
+			if summary[i].PEHigh > maxH {
+				maxH = summary[i].PEHigh
+			}
+			if summary[i].PELow > maxL {
+				maxL = summary[i].PELow
+			}
+			if summary[i].PEHigh < minH {
+				minH = summary[i].PEHigh
+			}
+			if summary[i].PELow < minL {
+				minL = summary[i].PELow
+			}
+			sumH += summary[i].PEHigh
+			sumL += summary[i].PELow
+			sumRoe5yr += summary[i].ROE
+		}
+		*peHighMmo5yr = int(math.Round(float64(sumH-maxH-minH) / 3.0))
+		*peLowMmo5yr = int(math.Round(float64(sumL-maxL-minL) / 3.0))
+		*roe5yr = sumRoe5yr / 5.0
+	}
 }
 
 func HeadlineByTicker(w http.ResponseWriter, r *http.Request) {
@@ -726,43 +824,10 @@ func HeadlineByTicker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var epsCagr5yr, epsCagr10yr, epsCagr2yr, epsCagr7yr, roe5yr, sumRoe5yr float64
+	var epsCagr5yr, epsCagr10yr, epsCagr2yr, epsCagr7yr, roe5yr float64
 	var price, pe, divPlusGrowth, epsYield, dpsYield, cagr5yr, cagr10yr, croe5yr, croe10yr float64
 	var peHighMmo5yr, peLowMmo5yr int
-	var sumH, sumL, maxH, maxL, minH, minL int
-	minH = math.MaxInt64
-	minL = math.MaxInt64
-	if len(summary) > 6 && summary[0].EPS > 0.0 && summary[1].EPS > 0.0 && summary[5].EPS > 0.0 && summary[6].EPS > 0.0 {
-		first := ((summary[5].EPS + summary[6].EPS) / 2.0)
-		last := ((summary[0].EPS + summary[1].EPS) / 2.0)
-		epsCagr5yr = math.Pow(last/first, 0.2) - 1.0
-	}
-	if len(summary) > 10 && summary[0].EPS > 0.0 && summary[10].EPS > 0.0 {
-		epsCagr10yr = math.Pow(summary[0].EPS/summary[10].EPS, 0.1) - 1.0
-	}
-
-	if len(summary) >= 5 {
-		for i := 0; i < 5; i++ {
-			if summary[i].PEHigh > maxH {
-				maxH = summary[i].PEHigh
-			}
-			if summary[i].PELow > maxL {
-				maxL = summary[i].PELow
-			}
-			if summary[i].PEHigh < minH {
-				minH = summary[i].PEHigh
-			}
-			if summary[i].PELow < minL {
-				minL = summary[i].PELow
-			}
-			sumH += summary[i].PEHigh
-			sumL += summary[i].PELow
-			sumRoe5yr += summary[i].ROE
-		}
-		peHighMmo5yr = int(math.Round(float64(sumH-maxH-minH) / 3.0))
-		peLowMmo5yr = int(math.Round(float64(sumL-maxL-minL) / 3.0))
-		roe5yr = sumRoe5yr / 5.0
-	}
+	HeadlineFromSummary(summary, &peHighMmo5yr, &peLowMmo5yr, &epsCagr5yr, &epsCagr10yr, &roe5yr)
 
 	var projections api.JsonProjections
 	err = api.ProjectionsBySymbol(args.Ticker, &projections)
@@ -843,13 +908,25 @@ func SummaryByTicker(w http.ResponseWriter, r *http.Request) {
 			// continue on, it's ok if we can't get historical market data
 		}
 		s := api.JsonSummary{}
+		ebitda := income[i].NetIncome - income[i].InterestExpNet - income[i].IncomeTax - income[i].DeprAmor // Expenses are stored as negative
 		s.ReportDate = income[i].ReportDate
 		s.EPS = income[i].EPS
 		s.SharesDiluted = income[i].SharesDiluted
 		s.MarketCap = int64(mdhYearSummary.Close * float64(s.SharesDiluted))
+		if income[i].Revenue > 0.0 {
+			s.GrMgn = float64(income[i].GrossProfit) / float64(income[i].Revenue)
+			s.OpMgn = float64(income[i].OperatingIncome) / float64(income[i].Revenue)
+			s.NetMgn = float64(income[i].NetIncome) / float64(income[i].Revenue)
+		}
 		if s.EPS != 0.0 {
 			s.PEHigh = int(math.Round(mdhYearSummary.High / s.EPS))
 			s.PELow = int(math.Round(mdhYearSummary.Low / s.EPS))
+		}
+		if income[i].InterestExpNet < 0.0 {
+			s.IntCov = float64(income[i].OperatingIncome) / float64(income[i].InterestExpNet*-1)
+		}
+		if i < len(balance) && ebitda > 0.0 {
+			s.LTDRatio = float64(balance[i].LtDebt) / float64(ebitda)
 		}
 		if i < len(cashflow) {
 			s.DPS = cashflow[i].DPS

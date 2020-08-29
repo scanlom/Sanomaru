@@ -46,12 +46,13 @@ type JsonProjections struct {
 	EPS        float64 `json:"eps" db:"eps"`
 	DPS        float64 `json:"dps" db:"dps"`
 	Growth     float64 `json:"growth" db:"growth"`
-	PETerminal float64 `json:"peTerminal" db:"pe_terminal"`
+	PETerminal int     `json:"peTerminal" db:"pe_terminal"`
 	Payout     float64 `json:"payout" db:"payout"`
 	Book       float64 `json:"book" db:"book"`
 	ROE        float64 `json:"roe" db:"roe"`
 	EPSYr1     float64 `json:"epsYr1" db:"eps_yr1"`
 	EPSYr2     float64 `json:"epsYr2" db:"eps_yr2"`
+	EntryType  string  `json:"entryType"`
 }
 
 type JsonMDHYearSummary struct {
@@ -208,6 +209,11 @@ type JsonSummary struct {
 	PELow         int     `json:"peLow"`
 	ROE           float64 `json:"roe"`
 	ROA           float64 `json:"roa"`
+	GrMgn         float64 `json:"grMgn"`
+	OpMgn         float64 `json:"opMgn"`
+	NetMgn        float64 `json:"netMgn"`
+	LTDRatio      float64 `json:"ltdRatio"`
+	IntCov        float64 `json:"intCov"`
 	MarketCap     int64   `json:"marketCap"`
 	SharesDiluted int64   `json:"sharesDiluted" db:"shares_diluted"`
 }

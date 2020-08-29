@@ -32,8 +32,16 @@ func Scalar(name string) (float64, error) {
 	return val.Value, nil
 }
 
+var symbolToRefDataID = make(map[string]int)
+
 func SymbolToRefDataID(symbol string) (int, error) {
 	log.Println("Api.SymbolToRefDataID: Called...")
+	if id, cached := symbolToRefDataID[symbol]; cached {
+		log.Println("Api.SymbolToRefDataID: Returning cached value")
+		log.Println("Api.SymbolToRefDataID: Success!")
+		return id, nil
+	}
+
 	response, err := http.Get(fmt.Sprintf("http://localhost:8081/blue-lion/read/ref-data?symbol=%s", symbol))
 	if err != nil {
 		return 0, err
@@ -50,6 +58,7 @@ func SymbolToRefDataID(symbol string) (int, error) {
 		return 0, err
 	}
 
+	symbolToRefDataID[symbol] = ret.ID
 	log.Println("Api.SymbolToRefDataID: Success!")
 	return ret.ID, nil
 }
