@@ -224,7 +224,7 @@ func JsonToNamedInsert(val interface{}, table string) string {
 	t := reflect.TypeOf(val)
 	for i := 0; i < t.NumField(); i++ {
 		tag := t.Field(i).Tag.Get("db")
-		if tag != "id" {
+		if len(tag) > 0 && tag != "id" {
 			cols += tag + ","
 			params += ":" + tag + ","
 		}
@@ -240,7 +240,7 @@ func JsonToNamedUpdate(val interface{}, table string) string {
 	t := reflect.TypeOf(val)
 	for i := 0; i < t.NumField(); i++ {
 		tag := t.Field(i).Tag.Get("db")
-		if tag != "id" {
+		if len(tag) > 0 && tag != "id" {
 			update += tag + "=:" + tag + ","
 		}
 	}
@@ -254,7 +254,9 @@ func JsonToSelect(val interface{}, table string) string {
 	t := reflect.TypeOf(val)
 	for i := 0; i < t.NumField(); i++ {
 		tag := t.Field(i).Tag.Get("db")
-		cols += tag + ","
+		if len(tag) > 0 {
+			cols += tag + ","
+		}
 	}
 	cols = strings.TrimRight(cols, ",")
 	ret := fmt.Sprintf("SELECT %s FROM %s", cols, table)
