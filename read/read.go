@@ -3,13 +3,14 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"math"
+	"net/http"
+
 	"github.com/gorilla/mux"
 	"github.com/gorilla/schema"
 	"github.com/scanlom/Sanomaru/api"
 	"github.com/scanlom/Sanomaru/cmn"
-	"log"
-	"math"
-	"net/http"
 )
 
 func setupRouter(router *mux.Router) {
@@ -139,6 +140,7 @@ func ProjectionsBySymbol(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if len(summary) > 0 {
+			ret.RefDataID = refDataID
 			ret.Date = summary[0].ReportDate
 			ret.EPS = summary[0].EPS
 			ret.DPS = summary[0].DPS
@@ -747,12 +749,29 @@ func Cagr(years float64, projections api.JsonProjections, md api.JsonMarketData)
 	divBucket := 0.0
 	divGrowth, _ := api.Scalar(api.CONST_DIV_GROWTH)
 	eps := projections.EPS
-	log.Printf("DG: %f, EPS: %f", divGrowth, eps)
 	for i := 0.0; i < years; i++ {
 		divBucket = divBucket * (1.0 + divGrowth)
 		divBucket = divBucket + (eps * projections.Payout)
 		eps = eps * (1.0 + projections.Growth)
-		log.Printf("YR %d, EPS %f, DB %f", i, eps, divBucket)
+	}
+	ret := math.Pow(((eps*float64(projections.PETerminal))+divBucket)/md.Last, 1.0/years) - 1.0
+	return math.Round(ret*100000000) / 100000000
+}
+
+func Croe(years float64, projections api.JsonProjections, md api.JsonMarketData) float64 {
+	if projections.Book <= 0.0 || projections.ROE <= 0.0 || projections.PETerminal <= 0.0 || md.Last <= 0.0 {
+		return 0.0
+	}
+	divBucket := 0.0
+	divGrowth, _ := api.Scalar(api.CONST_DIV_GROWTH)
+	book := projections.Book
+	eps := 0.0
+	for i := 0.0; i < years; i++ {
+		divBucket = divBucket * (1.0 + divGrowth)
+		eps = book * projections.ROE
+		div := eps * projections.Payout
+		divBucket += div
+		book += eps - div
 	}
 	ret := math.Pow(((eps*float64(projections.PETerminal))+divBucket)/md.Last, 1.0/years) - 1.0
 	return math.Round(ret*100000000) / 100000000
@@ -851,7 +870,9 @@ func HeadlineByTicker(w http.ResponseWriter, r *http.Request) {
 		dpsYield = projections.DPS / price
 		divPlusGrowth = dpsYield + projections.Growth
 		cagr5yr = Cagr(5.0, projections, md)
+		croe5yr = Croe(5.0, projections, md)
 		cagr10yr = Cagr(10.0, projections, md)
+		croe10yr = Croe(10.0, projections, md)
 	}
 
 	ret := api.JsonHeadline{Ticker: args.Ticker, Description: refData.Description, Sector: refData.Sector, Industry: refData.Industry,
