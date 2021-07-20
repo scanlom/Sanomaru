@@ -126,7 +126,7 @@ func ProjectionsBySymbol(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var ret api.JsonProjections
-	err = db.Get(&ret, fmt.Sprintf("%s WHERE ref_data_id=%d", api.JsonToSelect(ret, "projections"), refDataID))
+	err = db.Get(&ret, fmt.Sprintf("%s WHERE ref_data_id=%d ORDER BY id DESC LIMIT 1", api.JsonToSelect(ret, "projections"), refDataID))
 	if err != nil {
 		log.Println(err)
 		ret.EntryType = "D"
