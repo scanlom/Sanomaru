@@ -249,16 +249,22 @@ func JsonToNamedUpdate(val interface{}, table string) string {
 	return ret
 }
 
-func JsonToSelect(val interface{}, table string) string {
+func JsonToSelect(val interface{}, table string, prefix string) string {
 	var cols string
 	t := reflect.TypeOf(val)
 	for i := 0; i < t.NumField(); i++ {
 		tag := t.Field(i).Tag.Get("db")
 		if len(tag) > 0 {
+			if len(prefix) > 0 {
+				cols += prefix + "."
+			}
 			cols += tag + ","
 		}
 	}
 	cols = strings.TrimRight(cols, ",")
 	ret := fmt.Sprintf("SELECT %s FROM %s", cols, table)
+	if len(prefix) > 0 {
+		ret += " " + prefix
+	}
 	return ret
 }

@@ -53,7 +53,7 @@ func RestHandleGet(w http.ResponseWriter, r *http.Request, msg string, ptr inter
 		return
 	}
 
-	err = db.Get(ptr, fmt.Sprintf("%s WHERE id=%d", api.JsonToSelect(obj, table), id))
+	err = db.Get(ptr, fmt.Sprintf("%s WHERE id=%d", api.JsonToSelect(obj, table, ""), id))
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -89,7 +89,7 @@ func RestHandleGetBySymbol(w http.ResponseWriter, r *http.Request, msg string, p
 		return
 	}
 
-	err = db.Get(ptr, fmt.Sprintf("%s WHERE ref_data_id=%d", api.JsonToSelect(obj, table), refDataID))
+	err = db.Get(ptr, fmt.Sprintf("%s WHERE ref_data_id=%d", api.JsonToSelect(obj, table, ""), refDataID))
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -126,7 +126,7 @@ func ProjectionsBySymbol(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var ret api.JsonProjections
-	err = db.Get(&ret, fmt.Sprintf("%s WHERE ref_data_id=%d ORDER BY id DESC LIMIT 1", api.JsonToSelect(ret, "projections"), refDataID))
+	err = db.Get(&ret, fmt.Sprintf("%s WHERE ref_data_id=%d ORDER BY id DESC LIMIT 1", api.JsonToSelect(ret, "projections", ""), refDataID))
 	if err != nil {
 		log.Println(err)
 		ret.EntryType = "D"
@@ -327,7 +327,7 @@ func RefDataFocus(w http.ResponseWriter, r *http.Request) {
 
 	foo := api.JsonRefData{}
 	ret := []api.JsonRefData{}
-	err = db.Select(&ret, fmt.Sprintf("%s WHERE active=true AND focus=true", api.JsonToSelect(foo, "ref_data")))
+	err = db.Select(&ret, fmt.Sprintf("%s WHERE active=true AND focus=true", api.JsonToSelect(foo, "ref_data", "")))
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -349,7 +349,7 @@ func RefData(w http.ResponseWriter, r *http.Request) {
 
 	foo := api.JsonRefData{}
 	ret := []api.JsonRefData{}
-	err = db.Select(&ret, fmt.Sprintf("%s WHERE active=true", api.JsonToSelect(foo, "ref_data")))
+	err = db.Select(&ret, fmt.Sprintf("%s, market_data m WHERE r.active=true AND r.id = m.ref_data_id ORDER BY m.updated_at ASC", api.JsonToSelect(foo, "ref_data", "r")))
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -373,7 +373,7 @@ func RefDataByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ret := api.JsonRefData{}
-	err = db.Get(&ret, fmt.Sprintf("%s WHERE id=%s", api.JsonToSelect(ret, "ref_data"), id))
+	err = db.Get(&ret, fmt.Sprintf("%s WHERE id=%s", api.JsonToSelect(ret, "ref_data", ""), id))
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -402,7 +402,7 @@ func RefDataBySymbol(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ret := api.JsonRefData{}
-	err = db.Get(&ret, fmt.Sprintf("%s WHERE symbol='%s'", api.JsonToSelect(ret, "ref_data"), args.Symbol))
+	err = db.Get(&ret, fmt.Sprintf("%s WHERE symbol='%s'", api.JsonToSelect(ret, "ref_data", ""), args.Symbol))
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -468,7 +468,7 @@ func SimfinIncomeByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ret := api.JsonSimfinIncome{}
-	err = db.Get(&ret, api.JsonToSelect(ret, "simfin_income")+fmt.Sprintf(" WHERE id=%s", id))
+	err = db.Get(&ret, api.JsonToSelect(ret, "simfin_income", "")+fmt.Sprintf(" WHERE id=%s", id))
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -502,7 +502,7 @@ func SimfinIncomeByTicker(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ret := []api.JsonSimfinIncome{}
-	err = db.Select(&ret, api.JsonToSelect(api.JsonSimfinIncome{}, "simfin_income")+fmt.Sprintf(" WHERE ticker='%s' ORDER BY fiscal_year DESC", args.Ticker))
+	err = db.Select(&ret, api.JsonToSelect(api.JsonSimfinIncome{}, "simfin_income", "")+fmt.Sprintf(" WHERE ticker='%s' ORDER BY fiscal_year DESC", args.Ticker))
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -563,7 +563,7 @@ func SimfinBalanceByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ret := api.JsonSimfinBalance{}
-	err = db.Get(&ret, api.JsonToSelect(ret, "simfin_balance")+fmt.Sprintf(" WHERE id=%s", id))
+	err = db.Get(&ret, api.JsonToSelect(ret, "simfin_balance", "")+fmt.Sprintf(" WHERE id=%s", id))
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -597,7 +597,7 @@ func SimfinBalanceByTicker(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ret := []api.JsonSimfinBalance{}
-	err = db.Select(&ret, api.JsonToSelect(api.JsonSimfinBalance{}, "simfin_balance")+fmt.Sprintf(" WHERE ticker='%s' ORDER BY fiscal_year DESC", args.Ticker))
+	err = db.Select(&ret, api.JsonToSelect(api.JsonSimfinBalance{}, "simfin_balance", "")+fmt.Sprintf(" WHERE ticker='%s' ORDER BY fiscal_year DESC", args.Ticker))
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -656,7 +656,7 @@ func SimfinCashflowByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ret := api.JsonSimfinCashflow{}
-	err = db.Get(&ret, api.JsonToSelect(ret, "simfin_cashflow")+fmt.Sprintf(" WHERE id=%s", id))
+	err = db.Get(&ret, api.JsonToSelect(ret, "simfin_cashflow", "")+fmt.Sprintf(" WHERE id=%s", id))
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -690,7 +690,7 @@ func SimfinCashflowByTicker(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ret := []api.JsonSimfinCashflow{}
-	err = db.Select(&ret, api.JsonToSelect(api.JsonSimfinCashflow{}, "simfin_cashflow")+fmt.Sprintf(" WHERE ticker='%s' ORDER BY fiscal_year DESC", args.Ticker))
+	err = db.Select(&ret, api.JsonToSelect(api.JsonSimfinCashflow{}, "simfin_cashflow", "")+fmt.Sprintf(" WHERE ticker='%s' ORDER BY fiscal_year DESC", args.Ticker))
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -878,7 +878,7 @@ func HeadlineByTicker(w http.ResponseWriter, r *http.Request) {
 	ret := api.JsonHeadline{Ticker: args.Ticker, Description: refData.Description, Sector: refData.Sector, Industry: refData.Industry,
 		EPSCagr5yr: epsCagr5yr, EPSCagr10yr: epsCagr10yr, EPSCagr2yr: epsCagr2yr, EPSCagr7yr: epsCagr7yr, PEHighMMO5yr: peHighMmo5yr, PELowMMO5yr: peLowMmo5yr, ROE5yr: roe5yr,
 		Price: price, PE: pe, DivPlusGrowth: divPlusGrowth, EPSYield: epsYield, DPSYield: dpsYield, CAGR5yr: cagr5yr, CAGR10yr: cagr10yr, CROE5yr: croe5yr, CROE10yr: croe10yr,
-		Magic: epsCagr5yr}
+		Magic: cagr5yr}
 	json.NewEncoder(w).Encode(&ret)
 
 	cmn.Exit("Read-HeadlineByTicker", ret)
@@ -954,8 +954,12 @@ func SummaryByTicker(w http.ResponseWriter, r *http.Request) {
 		}
 		// For ROE and ROA, need to make sure we're not on the last year
 		if i < len(income)-1 && i < len(balance)-1 {
-			s.ROE = float64(income[i].NetIncome) / (float64(balance[i].TotalEquity+balance[i+1].TotalEquity) / 2.0)
-			s.ROA = float64(income[i].NetIncome) / (float64(balance[i].TotalAssets+balance[i+1].TotalAssets) / 2.0)
+			if balance[i].TotalEquity+balance[i+1].TotalEquity > 0.0 {
+				s.ROE = float64(income[i].NetIncome) / (float64(balance[i].TotalEquity+balance[i+1].TotalEquity) / 2.0)
+			}
+			if balance[i].TotalAssets+balance[i+1].TotalAssets > 0.0 {
+				s.ROA = float64(income[i].NetIncome) / (float64(balance[i].TotalAssets+balance[i+1].TotalAssets) / 2.0)
+			}
 		}
 		ret = append(ret, s)
 	}
