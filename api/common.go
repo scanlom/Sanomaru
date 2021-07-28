@@ -71,6 +71,7 @@ type JsonSimfinIncome struct {
 	FiscalPeriod        string `json:"fiscalPeriod" db:"fiscal_period"`
 	ReportDate          string `json:"reportDate" db:"report_date"`
 	PublishDate         string `json:"publishDate" db:"publish_date"`
+	RestatedDate        string `json:"restatedDate" db:"restated_date"`
 	SharesBasic         int64  `json:"sharesBasic" db:"shares_basic"`
 	SharesDiluted       int64  `json:"sharesDiluted" db:"shares_diluted"`
 	Revenue             int64  `json:"revenue" db:"revenue"`
@@ -87,6 +88,7 @@ type JsonSimfinIncome struct {
 	AbnormGainLoss      int64  `json:"abnormGainLoss" db:"abnorm_gain_loss"`
 	PretaxIncomeLoss    int64  `json:"pretaxIncomeLoss" db:"pretax_income_loss"`
 	IncomeTax           int64  `json:"incomeTax" db:"income_tax"`
+	IncomeAffilNetTax   int64  `json:"incomeAffilNetTax" db:"income_affil_net_tax"`
 	IncomeContOp        int64  `json:"incomeContOp" db:"income_cont_op"`
 	NetExtrGainLoss     int64  `json:"netExtrGainLoss" db:"net_extr_gain_loss"`
 	NetIncome           int64  `json:"netIncome" db:"net_income"`
@@ -108,6 +110,7 @@ type JsonSimfinBalance struct {
 	FiscalPeriod      string `json:"fiscalPeriod" db:"fiscal_period"`
 	ReportDate        string `json:"reportDate" db:"report_date"`
 	PublishDate       string `json:"publishDate" db:"publish_date"`
+	RestatedDate      string `json:"restatedDate" db:"restated_date"`
 	SharesBasic       int64  `json:"sharesBasic" db:"shares_basic"`
 	SharesDiluted     int64  `json:"sharesDiluted" db:"shares_diluted"`
 	CashEquivStInvest int64  `json:"cashEquivStInvest" db:"cash_equiv_st_invest"`
@@ -125,6 +128,7 @@ type JsonSimfinBalance struct {
 	LtDebt            int64  `json:"ltDebt" db:"lt_debt"`
 	TotalNoncurLiab   int64  `json:"totalNoncurLiab" db:"total_noncur_liab"`
 	TotalLiabilities  int64  `json:"totalLiabilities" db:"total_liabilities"`
+	PreferredEquity   int64  `json:"preferredEquity" db:"preferred_equity"`
 	ShareCapitalAdd   int64  `json:"shareCapitalAdd" db:"share_capital_add"`
 	TreasuryStock     int64  `json:"treasuryStock" db:"treasury_stock"`
 	RetainedEarnings  int64  `json:"retainedEarnings" db:"retained_earnings"`
@@ -146,6 +150,7 @@ type JsonSimfinCashflow struct {
 	FiscalPeriod         string `json:"fiscalPeriod" db:"fiscal_period"`
 	ReportDate           string `json:"reportDate" db:"report_date"`
 	PublishDate          string `json:"publishDate" db:"publish_date"`
+	RestatedDate         string `json:"restatedDate" db:"restated_date"`
 	SharesBasic          int64  `json:"sharesBasic" db:"shares_basic"`
 	SharesDiluted        int64  `json:"sharesDiluted" db:"shares_diluted"`
 	NetIncomeStart       int64  `json:"netIncomeStart" db:"net_income_start"`
@@ -165,6 +170,7 @@ type JsonSimfinCashflow struct {
 	CashRepayDebt        int64  `json:"cashRepayDebt" db:"cash_repay_debt"`
 	CashRepurchaseEquity int64  `json:"cashRepurchaseEquity" db:"cash_repurchase_equity"`
 	NetCashFin           int64  `json:"netCashFin" db:"net_cash_fin"`
+	EffectFxRates        int64  `json:"effectFxRates" db:"effect_fx_rates"`
 	NetChgCash           int64  `json:"netChgCash" db:"net_chg_cash"`
 	EntryType            string `json:"entryType" db:"entry_type"`
 }

@@ -3,11 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"net/http"
+
 	"github.com/gorilla/mux"
 	"github.com/scanlom/Sanomaru/api"
 	"github.com/scanlom/Sanomaru/cmn"
-	"log"
-	"net/http"
 )
 
 func setupRouter(router *mux.Router) {
