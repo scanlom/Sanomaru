@@ -152,6 +152,9 @@ func ProjectionsBySymbol(w http.ResponseWriter, r *http.Request) {
 			ret.Growth = epsCagr5yr
 			ret.ROE = roe5yr
 			ret.PETerminal = (peHighMmo5yr + peLowMmo5yr) / 2
+			if ret.PETerminal > 18.0 { // Cap PETerminal at 18
+				ret.PETerminal = 18.0
+			}
 			ret.EPSYr1 = ret.EPS * (1.0 + epsCagr5yr)
 			ret.EPSYr2 = ret.EPSYr1 * (1.0 + epsCagr5yr)
 		}
@@ -541,7 +544,7 @@ func IncomeByTicker(w http.ResponseWriter, r *http.Request) {
 	for s := range simfin {
 		i := api.JsonIncome{JsonSimfinIncome: simfin[s]}
 		if i.SharesDiluted > 0.0 {
-			i.EPS = cmn.Round(float64(i.NetIncome)/float64(i.SharesDiluted), 0.01)
+			i.EPS = cmn.Round(float64(i.NetIncomeCommon)/float64(i.SharesDiluted), 0.01)
 		}
 		ret = append(ret, i)
 	}
@@ -635,7 +638,6 @@ func BalanceByTicker(w http.ResponseWriter, r *http.Request) {
 	ret := []api.JsonBalance{}
 	for s := range simfin {
 		i := api.JsonBalance{JsonSimfinBalance: simfin[s]}
-		//i.EPS = cmn.Round(float64(i.NetIncome)/float64(i.SharesDiluted), 0.01)
 		ret = append(ret, i)
 	}
 	json.NewEncoder(w).Encode(&ret)
@@ -844,7 +846,7 @@ func HeadlineByTicker(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var epsCagr5yr, epsCagr10yr, epsCagr2yr, epsCagr7yr, roe5yr float64
-	var price, pe, divPlusGrowth, epsYield, dpsYield, cagr5yr, cagr10yr, croe5yr, croe10yr float64
+	var price, pe, divPlusGrowth, epsYield, dpsYield, cagr5yr, cagr10yr, croe5yr, croe10yr, magic float64
 	var peHighMmo5yr, peLowMmo5yr int
 	HeadlineFromSummary(summary, &peHighMmo5yr, &peLowMmo5yr, &epsCagr5yr, &epsCagr10yr, &roe5yr)
 
@@ -875,10 +877,20 @@ func HeadlineByTicker(w http.ResponseWriter, r *http.Request) {
 		croe10yr = Croe(10.0, projections, md)
 	}
 
+	if len(summary) >= 5 {
+		magic = cagr5yr
+		for i := 0; i < 5; i++ {
+			if summary[i].NetMgn < 0.10 || summary[i].LTDRatio > 3.5 || summary[i].EPS <= 0.0 {
+				magic = 0.0
+				break
+			}
+		}
+	}
+
 	ret := api.JsonHeadline{Ticker: args.Ticker, Description: refData.Description, Sector: refData.Sector, Industry: refData.Industry,
 		EPSCagr5yr: epsCagr5yr, EPSCagr10yr: epsCagr10yr, EPSCagr2yr: epsCagr2yr, EPSCagr7yr: epsCagr7yr, PEHighMMO5yr: peHighMmo5yr, PELowMMO5yr: peLowMmo5yr, ROE5yr: roe5yr,
 		Price: price, PE: pe, DivPlusGrowth: divPlusGrowth, EPSYield: epsYield, DPSYield: dpsYield, CAGR5yr: cagr5yr, CAGR10yr: cagr10yr, CROE5yr: croe5yr, CROE10yr: croe10yr,
-		Magic: cagr5yr}
+		Magic: magic}
 	json.NewEncoder(w).Encode(&ret)
 
 	cmn.Exit("Read-HeadlineByTicker", ret)

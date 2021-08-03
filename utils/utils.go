@@ -2,18 +2,20 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/gorilla/mux"
-	"github.com/gorilla/schema"
-	"github.com/scanlom/Sanomaru/api"
 	"log"
 	"math"
 	"net/http"
 	"strings"
+
+	"github.com/gorilla/mux"
+	"github.com/gorilla/schema"
+	"github.com/scanlom/Sanomaru/api"
 )
 
 const CONST_DIV_GROWTH = "DIV_GROWTH"
 const CONST_CONFIDENCE_NONE = "NONE"
 const CONST_CONFIDENCE_LOW = "LOW"
+const CONST_CONFIDENCE_BLAH = "BLAH"
 const CONST_CONFIDENCE_MEDIUM = "MEDIUM"
 const CONST_CONFIDENCE_HIGH = "HIGH"
 
@@ -65,6 +67,8 @@ func Confidence(w http.ResponseWriter, r *http.Request) {
 		result = CONST_CONFIDENCE_HIGH
 	} else if strings.Contains(args.Research, CONST_CONFIDENCE_MEDIUM) {
 		result = CONST_CONFIDENCE_MEDIUM
+	} else if strings.Contains(args.Research, CONST_CONFIDENCE_BLAH) {
+		result = CONST_CONFIDENCE_BLAH
 	} else if strings.Contains(args.Research, CONST_CONFIDENCE_LOW) {
 		result = CONST_CONFIDENCE_LOW
 	}
