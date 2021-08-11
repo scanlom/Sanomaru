@@ -104,6 +104,7 @@ func Cagr(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	log.Println("Listening on http://localhost:8080/blue-lion/utils")
 	router := mux.NewRouter().StrictSlash(true)
 	setupRouter(router)
 	log.Fatal(http.ListenAndServe(":8080", router))

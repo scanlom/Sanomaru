@@ -981,6 +981,7 @@ func SummaryByTicker(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	log.Println("Listening on http://localhost:8081/blue-lion/read")
 	router := mux.NewRouter().StrictSlash(true)
 	setupRouter(router)
 	log.Fatal(http.ListenAndServe(":8081", router))

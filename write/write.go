@@ -201,6 +201,7 @@ func SimfinCashflowByIDDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	log.Println("Listening on http://localhost:8083/blue-lion/write")
 	router := mux.NewRouter().StrictSlash(true)
 	setupRouter(router)
 	log.Fatal(http.ListenAndServe(":8083", cmn.CorsMiddleware(router)))
