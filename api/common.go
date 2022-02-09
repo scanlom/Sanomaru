@@ -224,6 +224,33 @@ type JsonSummary struct {
 	SharesDiluted int64   `json:"sharesDiluted" db:"shares_diluted"`
 }
 
+type JsonMerger struct {
+	ID                int     `json:"id" db:"id"`
+	AcquirerRefDataID int     `json:"acquirerRefDataId" db:"acquirer_ref_data_id"`
+	TargetRefDataID   int     `json:"targetRefDataId" db:"target_ref_data_id"`
+	DealPrice         float64 `json:"dealPrice" db:"deal_price"`
+	FailPrice         float64 `json:"failPrice" db:"fail_price"`
+	BreakPrice        float64 `json:"breakPrice" db:"break_price"`
+	AnnounceDate      string  `json:"announceDate" db:"announce_date"`
+	MeetingDate       string  `json:"meetingDate" db:"meeting_date"`
+	CloseDate         string  `json:"closeDate" db:"close_date"`
+	BreakDate         string  `json:"breakDate" db:"break_date"`
+	Confidence        float64 `json:"confidence" db:"confidence"`
+	Dividends         float64 `json:"dividends" db:"dividends"`
+}
+
+type JsonEnrichedMerger struct {
+	JsonMerger
+	AcquirerTicker                 string  `json:"acquirerTicker"`
+	AcquirerDescription            string  `json:"acquirerDescription"`
+	TargetTicker                   string  `json:"targetTicker"`
+	TargetDescription              string  `json:"targetDescription"`
+	MarketPositiveReturn           float64 `json:"marketPositiveReturn"`
+	MarketNetReturn                float64 `json:"marketNetReturn"`
+	MarketPositiveReturnAnnualized float64 `json:"marketPositiveReturnAnnualized"`
+	MarketNetReturnAnnualized      float64 `json:"marketNetReturnAnnualized"`
+}
+
 func JsonToNamedInsert(val interface{}, table string) string {
 	var cols string
 	var params string

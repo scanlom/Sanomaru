@@ -160,3 +160,17 @@ func MarketDataBySymbol(symbol string, ret *JsonMarketData) error {
 		ret,
 	)
 }
+
+func RefDataByID(id int, ret *JsonRefData) error {
+	return RestGetByUrl("RefDataByID",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/ref-data/%d", id),
+		ret,
+	)
+}
+
+func Mergers(slice *[]JsonMerger) error {
+	return RestGetByUrl("Mergers",
+		"http://localhost:8081/blue-lion/read/mergers",
+		slice,
+	)
+}
