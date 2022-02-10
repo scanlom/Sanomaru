@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -39,6 +40,8 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/headline", HeadlineByTicker).Queries("ticker", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/mergers", Mergers).Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-mergers", EnrichedMergers).Methods("GET")
+	router.HandleFunc("/blue-lion/read/enriched-mergers/{id}", EnrichedMergersByID).Methods("GET")
+	router.HandleFunc("/blue-lion/read/enriched-mergers-journal", EnrichedMergersJournalByMergerID).Queries("mergerId", "").Methods("GET")
 	router.Methods("GET").Path("/blue-lion/read/scalar").HandlerFunc(Scalar)
 }
 
@@ -1007,6 +1010,37 @@ func Mergers(w http.ResponseWriter, r *http.Request) {
 	cmn.Exit("Read-Mergers", ret)
 }
 
+func EnrichMerger(m api.JsonMerger)(api.JsonEnrichedMerger, error) {
+	em := api.JsonEnrichedMerger{JsonMerger: m}
+	var acquirer api.JsonRefData
+	err := api.RefDataByID(em.AcquirerRefDataID, &acquirer)
+	if err != nil {
+		return em, err
+	}
+	var target api.JsonRefData
+	err = api.RefDataByID(em.TargetRefDataID, &target)
+	if err != nil {
+		return em, err
+	}
+	em.AcquirerTicker = acquirer.Symbol
+	em.AcquirerDescription = acquirer.Description
+	em.TargetTicker = target.Symbol
+	em.TargetDescription = target.Description
+
+	var md api.JsonMarketData
+	err = api.MarketDataBySymbol(target.Symbol, &md)
+	if err != nil {
+		return em, err
+	}
+	em.MarketPositiveReturn = cmn.Round(em.DealPrice/md.Last-1, 0.0001)
+	em.MarketNetReturn = cmn.Round( ((em.DealPrice-md.Last)*em.Confidence-(md.Last-em.FailPrice)*(1-em.Confidence)) / md.Last, 0.0001)
+	close_time, _ := time.Parse("2006-01-02T15:04:05Z", em.CloseDate)
+	annualize_multiple := 365 / (close_time.Sub(time.Now()).Hours() / 24)
+	em.MarketPositiveReturnAnnualized = cmn.Round( annualize_multiple * em.MarketPositiveReturn, 0.0001)
+	em.MarketNetReturnAnnualized = cmn.Round( annualize_multiple * em.MarketNetReturn, 0.0001)
+	return em, nil
+}
+
 func EnrichedMergers(w http.ResponseWriter, r *http.Request) {
 	cmn.Enter("Read-EnrichedMergers", r.URL.Query())
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -1020,43 +1054,93 @@ func EnrichedMergers(w http.ResponseWriter, r *http.Request) {
 
 	ret := []api.JsonEnrichedMerger{}
 	for i := range mergers {
-		em := api.JsonEnrichedMerger{JsonMerger: mergers[i]}
-		var acquirer api.JsonRefData
-		err = api.RefDataByID(em.AcquirerRefDataID, &acquirer)
-		var target api.JsonRefData
-		err2 := api.RefDataByID(em.TargetRefDataID, &target)
-		if err != nil || err2 != nil {
-			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
-			return
-		}
-		em.AcquirerTicker = acquirer.Symbol
-		em.AcquirerDescription = acquirer.Description
-		em.TargetTicker = target.Symbol
-		em.TargetDescription = target.Description
-
-		var md api.JsonMarketData
-		err = api.MarketDataBySymbol(target.Symbol, &md)
+		em, err := EnrichMerger(mergers[i])
 		if err != nil {
 			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 			return
 		}
-		em.MarketPositiveReturn = cmn.Round(em.DealPrice/md.Last-1, 0.0001)
-		em.MarketNetReturn = cmn.Round( ((em.DealPrice-md.Last)*em.Confidence-(md.Last-em.FailPrice)*(1-em.Confidence)) / md.Last, 0.0001)
-		close_time, _ := time.Parse("2006-01-02T15:04:05Z", em.CloseDate)
-		annualize_multiple := 365 / (close_time.Sub(time.Now()).Hours() / 24)
-		em.MarketPositiveReturnAnnualized = cmn.Round( annualize_multiple * em.MarketPositiveReturn, 0.0001)
-		em.MarketNetReturnAnnualized = cmn.Round( annualize_multiple * em.MarketNetReturn, 0.0001)
-
+	
 		ret = append(ret, em)
 	}
+	sort.Slice(ret, func(i, j int) bool {
+		if ret[i].MarketNetReturnAnnualized == ret[j].MarketNetReturnAnnualized {
+			return ret[i].MarketPositiveReturnAnnualized > ret[j].MarketPositiveReturnAnnualized
+		}
+		return ret[i].MarketNetReturnAnnualized > ret[j].MarketNetReturnAnnualized
+	  })
 	json.NewEncoder(w).Encode(&ret)
 
 	cmn.Exit("Read-EnrichedMergers", ret)
+}
+
+func EnrichedMergersByID(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-EnrichedMergersByID", r.URL.Query())
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	params := mux.Vars(r)
+	id := params["id"]
+
+	db, err := cmn.DbConnect()
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	m := api.JsonMerger{}
+	err = db.Get(&m, api.JsonToSelect(m, "mergers", "")+fmt.Sprintf(" WHERE id=%s", id))
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	em, err := EnrichMerger(m)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(&em)
+
+	cmn.Exit("Read-EnrichedMergersByID", em)
+}
+
+type EnrichedMergersJournalByMergerIDInput struct {
+	MergerID int `schema:"mergerId"`
+}
+
+func EnrichedMergersJournalByMergerID(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-EnrichedMergersJournalByMergerID", r.URL.Query())
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	args := new(EnrichedMergersJournalByMergerIDInput)
+	decoder := schema.NewDecoder()
+	err := decoder.Decode(args, r.URL.Query())
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		return
+	}
+
+	db, err := cmn.DbConnect()
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	ret := []api.JsonEnrichedMergerJournal{}
+	err = db.Select(&ret, api.JsonToSelect(api.JsonEnrichedMergerJournal{}, "mergers_journal", "")+fmt.Sprintf(" WHERE mergers_id=%d ORDER BY id DESC", args.MergerID))
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(&ret)
+
+	cmn.Exit("Read-EnrichedMergersJournalByMergerID", ret)
 }
 
 func main() {
 	log.Println("Listening on http://localhost:8081/blue-lion/read")
 	router := mux.NewRouter().StrictSlash(true)
 	setupRouter(router)
-	log.Fatal(http.ListenAndServe(":8081", router))
+	log.Fatal(http.ListenAndServe(":8081", cmn.CorsMiddleware(router)))
 }

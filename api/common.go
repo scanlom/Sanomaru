@@ -241,27 +241,44 @@ type JsonMerger struct {
 
 type JsonEnrichedMerger struct {
 	JsonMerger
-	AcquirerTicker                 string  `json:"acquirerTicker"`
-	AcquirerDescription            string  `json:"acquirerDescription"`
-	TargetTicker                   string  `json:"targetTicker"`
-	TargetDescription              string  `json:"targetDescription"`
-	MarketPositiveReturn           float64 `json:"marketPositiveReturn"`
-	MarketNetReturn                float64 `json:"marketNetReturn"`
-	MarketPositiveReturnAnnualized float64 `json:"marketPositiveReturnAnnualized"`
-	MarketNetReturnAnnualized      float64 `json:"marketNetReturnAnnualized"`
+	AcquirerTicker                 string  `json:"acquirerTicker" db:"acquirer_ticker"`
+	AcquirerDescription            string  `json:"acquirerDescription" db:"acquirer_description"`
+	TargetTicker                   string  `json:"targetTicker" db:"target_ticker"`
+	TargetDescription              string  `json:"targetDescription" db:"target_description"`
+	MarketPositiveReturn           float64 `json:"marketPositiveReturn" db:"market_positive_return"`
+	MarketNetReturn                float64 `json:"marketNetReturn" db:"market_net_return"`
+	MarketPositiveReturnAnnualized float64 `json:"marketPositiveReturnAnnualized" db:"market_positive_return_annualized"`
+	MarketNetReturnAnnualized      float64 `json:"marketNetReturnAnnualized" db:"market_net_return_annualized"`
+}
+
+type JsonEnrichedMergerJournal struct {
+	JsonEnrichedMerger
+	MergerID int    `json:"mergerId" db:"mergers_id"`
+	Entry    string `json:"entry" db:"entry"`
+}
+
+func JsonToNamedInsertInternal(t reflect.Type, cols *string, params *string) {
+	for i := 0; i < t.NumField(); i++ {
+		if t.Field(i).Type.Kind() == reflect.Struct {
+			JsonToNamedInsertInternal(t.Field(i).Type, cols, params)
+		} else {
+			tag := t.Field(i).Tag.Get("db")
+			if len(tag) > 0 && tag != "id" {
+				*cols += tag + ","
+				*params += ":" + tag + ","
+			}
+		}
+	}
 }
 
 func JsonToNamedInsert(val interface{}, table string) string {
 	var cols string
 	var params string
 	t := reflect.TypeOf(val)
-	for i := 0; i < t.NumField(); i++ {
-		tag := t.Field(i).Tag.Get("db")
-		if len(tag) > 0 && tag != "id" {
-			cols += tag + ","
-			params += ":" + tag + ","
-		}
-	}
+
+	// Sub Structures must be handled recursively
+	JsonToNamedInsertInternal(t, &cols, &params)
+
 	cols = strings.TrimRight(cols, ",")
 	params = strings.TrimRight(params, ",")
 	ret := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", table, cols, params)
@@ -282,18 +299,29 @@ func JsonToNamedUpdate(val interface{}, table string) string {
 	return ret
 }
 
+func JsonToSelectInternal(t reflect.Type, prefix string, cols *string) {
+	for i := 0; i < t.NumField(); i++ {
+		if t.Field(i).Type.Kind() == reflect.Struct {
+			JsonToSelectInternal(t.Field(i).Type, prefix, cols)
+		} else {
+			tag := t.Field(i).Tag.Get("db")
+			if len(tag) > 0 {
+				if len(prefix) > 0 {
+					*cols += prefix + "."
+				}
+				*cols += tag + ","
+			}
+		}
+	}
+}
+
 func JsonToSelect(val interface{}, table string, prefix string) string {
 	var cols string
 	t := reflect.TypeOf(val)
-	for i := 0; i < t.NumField(); i++ {
-		tag := t.Field(i).Tag.Get("db")
-		if len(tag) > 0 {
-			if len(prefix) > 0 {
-				cols += prefix + "."
-			}
-			cols += tag + ","
-		}
-	}
+
+	// Sub Structures must be handled recursively
+	JsonToSelectInternal(t, prefix, &cols)
+
 	cols = strings.TrimRight(cols, ",")
 	ret := fmt.Sprintf("SELECT %s FROM %s", cols, table)
 	if len(prefix) > 0 {

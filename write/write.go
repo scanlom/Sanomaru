@@ -26,6 +26,8 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/write/simfin-balance/{id}", SimfinBalanceByIDDelete).Methods("DELETE")
 	router.HandleFunc("/blue-lion/write/simfin-cashflow", SimfinCashflow).Methods("POST")
 	router.HandleFunc("/blue-lion/write/simfin-cashflow/{id}", SimfinCashflowByIDDelete).Methods("DELETE")
+	router.HandleFunc("/blue-lion/write/mergers/{id}", MergersByID).Methods("PUT")
+	router.HandleFunc("/blue-lion/write/enriched-mergers-journal", EnrichedMergersJournal).Methods("POST")
 }
 
 func RestHandlePost(w http.ResponseWriter, r *http.Request, msg string, ptr interface{}, obj interface{}, table string) {
@@ -198,6 +200,52 @@ func SimfinCashflow(w http.ResponseWriter, r *http.Request) {
 
 func SimfinCashflowByIDDelete(w http.ResponseWriter, r *http.Request) {
 	RestHandleDelete(w, r, "Write-SimfinCashflowByIDDelete", "simfin_cashflow")
+}
+
+func MergersByID(w http.ResponseWriter, r *http.Request) {
+	var ret api.JsonMerger
+	log.Println(ret)
+	RestHandlePut(w, r, "Write-MergersByID", &ret, ret, "mergers")
+}
+
+func EnrichedMergersJournal(w http.ResponseWriter, r *http.Request) {
+	var input api.JsonEnrichedMergerJournal
+	cmn.Enter("Write-EnrichedMergersJournal", r.URL.Query())
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/json")
+	err := json.NewDecoder(r.Body).Decode(&input)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+	cmn.LogPost("Write-EnrichedMergersJournal", input)
+
+	// We've been passed the mergerId and entry, retrieve other info directly from the mergers table
+	var em api.JsonEnrichedMerger
+	err = api.EnrichedMergersByID(input.MergerID, &em)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+	ret := api.JsonEnrichedMergerJournal{JsonEnrichedMerger: em}
+	ret.MergerID = ret.ID
+	ret.ID = 0
+	ret.Entry = input.Entry
+
+	db, err := cmn.DbConnect()
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	_, err = db.NamedExec(api.JsonToNamedInsert(ret, "mergers_journal"), &ret)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(&ret)
+	cmn.Exit("Write-EnrichedMergersJournal", &ret)
 }
 
 func main() {

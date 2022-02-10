@@ -174,3 +174,10 @@ func Mergers(slice *[]JsonMerger) error {
 		slice,
 	)
 }
+
+func EnrichedMergersByID(id int, ret *JsonEnrichedMerger) error {
+	return RestGetByUrl("EnrichedMergersByID",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/enriched-mergers/%d", id),
+		ret,
+	)
+}
