@@ -31,9 +31,8 @@ func setupRouter(router *mux.Router) {
 }
 
 func RestHandlePost(w http.ResponseWriter, r *http.Request, msg string, ptr interface{}, obj interface{}, table string) {
-	cmn.Enter(msg, r.URL.Query())
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-Type", "application/json")
+	cmn.Enter(msg, w, r.URL.Query())
+
 	err := json.NewDecoder(r.Body).Decode(ptr)
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
@@ -58,9 +57,8 @@ func RestHandlePost(w http.ResponseWriter, r *http.Request, msg string, ptr inte
 }
 
 func RestHandlePut(w http.ResponseWriter, r *http.Request, msg string, ptr interface{}, obj interface{}, table string) {
-	cmn.Enter(msg, r.URL.Query())
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-Type", "application/json")
+	cmn.Enter(msg, w, r.URL.Query())
+
 	params := mux.Vars(r)
 	id := params["id"]
 	err := json.NewDecoder(r.Body).Decode(ptr)
@@ -86,7 +84,8 @@ func RestHandlePut(w http.ResponseWriter, r *http.Request, msg string, ptr inter
 }
 
 func RestHandleDelete(w http.ResponseWriter, r *http.Request, msg string, table string) {
-	cmn.Enter(msg, r.URL.Query())
+	cmn.Enter(msg, w, r.URL.Query())
+
 	params := mux.Vars(r)
 	id := params["id"]
 
@@ -112,9 +111,8 @@ func MarketData(w http.ResponseWriter, r *http.Request) {
 }
 
 func MarketDataByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("MarketDataByID", r.URL.Query())
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	cmn.Enter("MarketDataByID", w, r.URL.Query())
+
 	params := mux.Vars(r)
 	id := params["id"]
 
@@ -210,9 +208,8 @@ func MergersByID(w http.ResponseWriter, r *http.Request) {
 
 func EnrichedMergersJournal(w http.ResponseWriter, r *http.Request) {
 	var input api.JsonEnrichedMergerJournal
-	cmn.Enter("Write-EnrichedMergersJournal", r.URL.Query())
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-Type", "application/json")
+	cmn.Enter("Write-EnrichedMergersJournal", w, r.URL.Query())
+
 	err := json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)

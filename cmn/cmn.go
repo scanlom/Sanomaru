@@ -1,12 +1,14 @@
 package cmn
 
 import (
-	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
-	"github.com/scanlom/Sanomaru/api"
 	"log"
 	"math"
 	"net/http"
+	"runtime"
+
+	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
+	"github.com/scanlom/Sanomaru/api"
 )
 
 type RestSymbolInput struct {
@@ -29,9 +31,11 @@ type RestRefDataIDDateInput struct {
 
 var db *sqlx.DB
 
-func Enter(name string, args interface{}) {
+func Enter(name string, w http.ResponseWriter, args interface{}) {
 	log.Printf("%s: Called...", name)
 	log.Printf("%s: Arguments: %v", name, args)
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/json")
 }
 
 func Exit(name string, ret interface{}) {
@@ -44,9 +48,10 @@ func LogPost(name string, ret interface{}) {
 }
 
 func ErrorHttp(err error, w http.ResponseWriter, code int) {
-	log.Println(err)
+    function, file, line, _ := runtime.Caller(1) // Ignoring the error as we are in an error handler anyway
+	log.Printf("ERROR: File: %s  Function: %s Line: %d", file, runtime.FuncForPC(function).Name(), line)
+	log.Printf("ERROR: %s", err)
 	w.WriteHeader(code)
-	return
 }
 
 func DbConnect() (*sqlx.DB, error) {

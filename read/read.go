@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -42,13 +43,13 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/enriched-mergers", EnrichedMergers).Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-mergers/{id}", EnrichedMergersByID).Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-mergers-journal", EnrichedMergersJournalByMergerID).Queries("mergerId", "").Methods("GET")
+	router.HandleFunc("/blue-lion/read/enriched-projections", EnrichedProjections).Methods("GET")
+	//router.HandleFunc("/blue-lion/read/enriched-projections/{id}", EnrichedProjectionsByID).Methods("GET")
 	router.Methods("GET").Path("/blue-lion/read/scalar").HandlerFunc(Scalar)
 }
 
 func RestHandleGet(w http.ResponseWriter, r *http.Request, msg string, ptr interface{}, obj interface{}, table string) {
-	cmn.Enter(msg, r.URL.Query())
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-Type", "application/json")
+	cmn.Enter(msg, w, r.URL.Query())
 
 	params := mux.Vars(r)
 	id := params["id"]
@@ -71,9 +72,7 @@ func RestHandleGet(w http.ResponseWriter, r *http.Request, msg string, ptr inter
 }
 
 func RestHandleGetBySymbol(w http.ResponseWriter, r *http.Request, msg string, ptr interface{}, obj interface{}, table string) {
-	cmn.Enter(msg, r.URL.Query())
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-Type", "application/json")
+	cmn.Enter(msg, w, r.URL.Query())
 
 	args := new(cmn.RestSymbolInput)
 	decoder := schema.NewDecoder()
@@ -107,9 +106,7 @@ func RestHandleGetBySymbol(w http.ResponseWriter, r *http.Request, msg string, p
 }
 
 func ProjectionsBySymbol(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-ProjectionsBySymbol", r.URL.Query())
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-Type", "application/json")
+	cmn.Enter("Read-ProjectionsBySymbol", w, r.URL.Query())
 
 	args := new(cmn.RestSymbolInput)
 	decoder := schema.NewDecoder()
@@ -135,7 +132,6 @@ func ProjectionsBySymbol(w http.ResponseWriter, r *http.Request) {
 	err = db.Get(&ret, fmt.Sprintf("%s WHERE ref_data_id=%d ORDER BY id DESC LIMIT 1", api.JsonToSelect(ret, "projections", ""), refDataID))
 	if err != nil {
 		log.Println(err)
-		ret.EntryType = "D"
 
 		var summary []api.JsonSummary
 		err = api.SummaryByTicker(args.Symbol, &summary)
@@ -164,12 +160,90 @@ func ProjectionsBySymbol(w http.ResponseWriter, r *http.Request) {
 			ret.EPSYr1 = ret.EPS * (1.0 + epsCagr5yr)
 			ret.EPSYr2 = ret.EPSYr1 * (1.0 + epsCagr5yr)
 		}
-	} else {
-		ret.EntryType = "O"
 	}
 
 	json.NewEncoder(w).Encode(&ret)
 	cmn.Exit("Read-ProjectionsBySymbol", &ret)
+}
+
+func EnrichedProjections(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-EnrichedProjections", w, r.URL.Query())
+
+	db, err := cmn.DbConnect()
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	foo := api.JsonProjections{}
+	var projections []api.JsonProjections
+	err = db.Select(&projections, api.JsonToSelect(foo, "projections", ""))
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	var ret []api.JsonEnrichedProjections
+	for p := range projections {
+		ep := api.JsonEnrichedProjections{JsonProjections: projections[p]}
+
+		var refData api.JsonRefData
+		err = api.RefDataByID(ep.RefDataID, &refData)
+		if err != nil {
+			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+			return
+		}
+
+		ep.Ticker = refData.Symbol
+		ep.Description = refData.Description
+		ep.Sector = refData.Sector
+		ep.Industry = refData.Industry
+		var summary []api.JsonSummary
+		err = api.SummaryByTicker(ep.Ticker, &summary)
+		if err != nil {
+			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+			return
+		}
+	
+		HeadlineFromSummary(summary, &ep.PEHighMMO5yr, &ep.PELowMMO5yr, &ep.EPSCagr5yr, &ep.EPSCagr10yr, &ep.ROE5yr)
+		if len(summary) > 0 && summary[0].EPS > 0.0 && ep.EPSYr2 > 0.0 {
+			ep.EPSCagr2yr = math.Pow(ep.EPSYr2/summary[0].EPS, 0.5) - 1.0
+		}
+		if len(summary) > 5 && summary[5].EPS > 0.0 && ep.EPSYr2 > 0.0 {
+			ep.EPSCagr7yr = math.Pow(ep.EPSYr2/summary[5].EPS, 0.142857143) - 1.0
+		}
+	
+		var md api.JsonMarketData
+		err = api.MarketDataBySymbol(ep.Ticker, &md)
+		if err == nil && md.Last > 0.0 {
+			ep.Price = md.Last
+			if ep.EPS > 0.0 {
+				ep.PE = ep.Price / ep.EPS
+			}
+			ep.EPSYield = ep.EPS / ep.Price
+			ep.DPSYield = ep.DPS / ep.Price
+			ep.DivPlusGrowth = ep.DPSYield + ep.Growth
+			ep.CAGR5yr = Cagr(5.0, ep.JsonProjections, md)
+			ep.CROE5yr = Croe(5.0, ep.JsonProjections, md)
+			ep.CAGR10yr = Cagr(10.0, ep.JsonProjections, md)
+			ep.CROE10yr = Croe(10.0, ep.JsonProjections, md)
+		}
+	
+		if len(summary) >= 5 {
+			ep.Magic = ep.CAGR5yr
+			for i := 0; i < 5; i++ {
+				if summary[i].NetMgn < 0.10 || summary[i].LTDRatio > 3.5 || summary[i].EPS <= 0.0 {
+					ep.Magic = 0.0
+					break
+				}
+			}
+		}
+
+		ret = append(ret, ep)
+	}
+
+	json.NewEncoder(w).Encode(&ret)
+	cmn.Exit("Read-EnrichedProjections", &ret)
 }
 
 func ProjectionsByID(w http.ResponseWriter, r *http.Request) {
@@ -178,7 +252,7 @@ func ProjectionsByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func MarketData(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("MarketData", r.URL.Query())
+	cmn.Enter("MarketData", w, r.URL.Query())
 
 	db, err := cmn.DbConnect()
 	if err != nil {
@@ -209,7 +283,7 @@ func MarketDataBySymbol(w http.ResponseWriter, r *http.Request) {
 }
 
 func MDHYearSummaryBySymbol(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-MDHYearSummaryBySymbol", r.URL.Query())
+	cmn.Enter("Read-MDHYearSummaryBySymbol", w, r.URL.Query())
 
 	args := new(cmn.RestSymbolDateInput)
 	decoder := schema.NewDecoder()
@@ -253,7 +327,7 @@ func MDHYearSummaryBySymbol(w http.ResponseWriter, r *http.Request) {
 }
 
 func MDHByRefDataIDDate(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-MDHByRefDataIDDate", r.URL.Query())
+	cmn.Enter("Read-MDHByRefDataIDDate", w, r.URL.Query())
 
 	args := new(cmn.RestRefDataIDDateInput)
 	decoder := schema.NewDecoder()
@@ -282,7 +356,7 @@ func MDHByRefDataIDDate(w http.ResponseWriter, r *http.Request) {
 }
 
 func MDHBySymbol(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-MDHBySymbol", r.URL.Query())
+	cmn.Enter("Read-MDHBySymbol", w, r.URL.Query())
 
 	args := new(cmn.RestSymbolDateInput)
 	decoder := schema.NewDecoder()
@@ -326,7 +400,7 @@ func MDHBySymbol(w http.ResponseWriter, r *http.Request) {
 }
 
 func RefDataFocus(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("RefDataFocus", r.URL.Query())
+	cmn.Enter("RefDataFocus", w, r.URL.Query())
 
 	db, err := cmn.DbConnect()
 	if err != nil {
@@ -348,7 +422,7 @@ func RefDataFocus(w http.ResponseWriter, r *http.Request) {
 }
 
 func RefData(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("RefData", r.URL.Query())
+	cmn.Enter("RefData", w, r.URL.Query())
 
 	db, err := cmn.DbConnect()
 	if err != nil {
@@ -370,7 +444,7 @@ func RefData(w http.ResponseWriter, r *http.Request) {
 }
 
 func RefDataByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("RefDataByID", r.URL.Query())
+	cmn.Enter("RefDataByID", w, r.URL.Query())
 
 	params := mux.Vars(r)
 	id := params["id"]
@@ -394,7 +468,7 @@ func RefDataByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func RefDataBySymbol(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("RefDataBySymbol", r.URL.Query())
+	cmn.Enter("RefDataBySymbol", w, r.URL.Query())
 
 	args := new(cmn.RestSymbolInput)
 	decoder := schema.NewDecoder()
@@ -436,7 +510,7 @@ type ScalarRet struct {
 }
 
 func Scalar(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Scalar", r.URL.Query())
+	cmn.Enter("Scalar", w, r.URL.Query())
 
 	args := new(ScalarInput)
 	decoder := schema.NewDecoder()
@@ -465,7 +539,7 @@ func Scalar(w http.ResponseWriter, r *http.Request) {
 }
 
 func SimfinIncomeByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("SimfinIncomeByID", r.URL.Query())
+	cmn.Enter("SimfinIncomeByID", w, r.URL.Query())
 
 	params := mux.Vars(r)
 	id := params["id"]
@@ -493,7 +567,7 @@ type SimfinIncomeInput struct {
 }
 
 func SimfinIncomeByTicker(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("SimfinIncomeByTicker", r.URL.Query())
+	cmn.Enter("SimfinIncomeByTicker", w, r.URL.Query())
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	args := new(SimfinIncomeInput)
@@ -527,7 +601,7 @@ type IncomeInput struct {
 }
 
 func IncomeByTicker(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("IncomeByTicker", r.URL.Query())
+	cmn.Enter("IncomeByTicker", w, r.URL.Query())
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	args := new(IncomeInput)
@@ -560,7 +634,7 @@ func IncomeByTicker(w http.ResponseWriter, r *http.Request) {
 }
 
 func SimfinBalanceByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("SimfinBalanceByID", r.URL.Query())
+	cmn.Enter("SimfinBalanceByID", w, r.URL.Query())
 
 	params := mux.Vars(r)
 	id := params["id"]
@@ -588,7 +662,7 @@ type SimfinBalanceInput struct {
 }
 
 func SimfinBalanceByTicker(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("SimfinBalanceByTicker", r.URL.Query())
+	cmn.Enter("SimfinBalanceByTicker", w, r.URL.Query())
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	args := new(SimfinBalanceInput)
@@ -622,7 +696,7 @@ type BalanceInput struct {
 }
 
 func BalanceByTicker(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("BalanceByTicker", r.URL.Query())
+	cmn.Enter("BalanceByTicker", w, r.URL.Query())
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	args := new(BalanceInput)
@@ -652,7 +726,7 @@ func BalanceByTicker(w http.ResponseWriter, r *http.Request) {
 }
 
 func SimfinCashflowByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("SimfinCashflowByID", r.URL.Query())
+	cmn.Enter("SimfinCashflowByID", w, r.URL.Query())
 
 	params := mux.Vars(r)
 	id := params["id"]
@@ -680,7 +754,7 @@ type SimfinCashflowInput struct {
 }
 
 func SimfinCashflowByTicker(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("SimfinCashflowByTicker", r.URL.Query())
+	cmn.Enter("SimfinCashflowByTicker", w, r.URL.Query())
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	args := new(SimfinCashflowInput)
@@ -714,7 +788,7 @@ type CashflowInput struct {
 }
 
 func CashflowByTicker(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("CashflowByTicker", r.URL.Query())
+	cmn.Enter("CashflowByTicker", w, r.URL.Query())
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	args := new(CashflowInput)
@@ -736,7 +810,7 @@ func CashflowByTicker(w http.ResponseWriter, r *http.Request) {
 	ret := []api.JsonCashflow{}
 	for s := range simfin {
 		i := api.JsonCashflow{JsonSimfinCashflow: simfin[s]}
-		if i.SharesDiluted > 0.0 {
+		if i.SharesBasic > 0.0 {
 			i.DPS = -1.0 * cmn.Round(float64(i.DividendsPaid)/float64(i.SharesBasic), 0.01)
 		}
 		ret = append(ret, i)
@@ -824,7 +898,7 @@ func HeadlineFromSummary(summary []api.JsonSummary, peHighMmo5yr *int, peLowMmo5
 }
 
 func HeadlineByTicker(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-HeadlineByTicker", r.URL.Query())
+	cmn.Enter("Read-HeadlineByTicker", w, r.URL.Query())
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	args := new(HeadlineInput)
@@ -903,7 +977,7 @@ func HeadlineByTicker(w http.ResponseWriter, r *http.Request) {
 }
 
 func SummaryByTicker(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-SummaryByTicker", r.URL.Query())
+	cmn.Enter("Read-SummaryByTicker", w, r.URL.Query())
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	args := new(cmn.RestTickerInput)
@@ -987,7 +1061,7 @@ func SummaryByTicker(w http.ResponseWriter, r *http.Request) {
 }
 
 func Mergers(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-Mergers", r.URL.Query())
+	cmn.Enter("Read-Mergers", w, r.URL.Query())
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 
@@ -1032,8 +1106,15 @@ func EnrichMerger(m api.JsonMerger)(api.JsonEnrichedMerger, error) {
 	if err != nil {
 		return em, err
 	}
-	em.MarketPositiveReturn = cmn.Round(em.DealPrice/md.Last-1, 0.0001)
-	em.MarketNetReturn = cmn.Round( ((em.DealPrice-md.Last)*em.Confidence-(md.Last-em.FailPrice)*(1-em.Confidence)) / md.Last, 0.0001)
+
+	fees := 0.005
+	if strings.Contains(em.TargetTicker, ".HK") {
+		fees = (0.0008 + 0.0013)*md.Last // 8 bps commison and 13 bps stamp on each side
+	}
+
+	em.MarketPositiveReturn = cmn.Round((em.DealPrice+em.Dividends-fees)/md.Last-1, 0.0001)
+	em.MarketNetReturn = cmn.Round( 
+		((em.DealPrice+em.Dividends-fees-md.Last)*em.Confidence-(md.Last-em.FailPrice-em.Dividends+2*fees)*(1-em.Confidence)) / md.Last, 0.0001)
 	close_time, _ := time.Parse("2006-01-02T15:04:05Z", em.CloseDate)
 	annualize_multiple := 365 / (close_time.Sub(time.Now()).Hours() / 24)
 	em.MarketPositiveReturnAnnualized = cmn.Round( annualize_multiple * em.MarketPositiveReturn, 0.0001)
@@ -1042,7 +1123,7 @@ func EnrichMerger(m api.JsonMerger)(api.JsonEnrichedMerger, error) {
 }
 
 func EnrichedMergers(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-EnrichedMergers", r.URL.Query())
+	cmn.Enter("Read-EnrichedMergers", w, r.URL.Query())
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	var mergers []api.JsonMerger
@@ -1074,7 +1155,7 @@ func EnrichedMergers(w http.ResponseWriter, r *http.Request) {
 }
 
 func EnrichedMergersByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-EnrichedMergersByID", r.URL.Query())
+	cmn.Enter("Read-EnrichedMergersByID", w, r.URL.Query())
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	params := mux.Vars(r)
@@ -1109,7 +1190,7 @@ type EnrichedMergersJournalByMergerIDInput struct {
 }
 
 func EnrichedMergersJournalByMergerID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-EnrichedMergersJournalByMergerID", r.URL.Query())
+	cmn.Enter("Read-EnrichedMergersJournalByMergerID", w, r.URL.Query())
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	args := new(EnrichedMergersJournalByMergerIDInput)
