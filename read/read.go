@@ -27,6 +27,7 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/ref-data", RefDataBySymbol).Queries("symbol", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/ref-data", RefData).Methods("GET")
 	router.HandleFunc("/blue-lion/read/projections/{id}", ProjectionsByID).Methods("GET")
+	router.HandleFunc("/blue-lion/read/projections", ProjectionsBySymbol).Queries("symbol", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/simfin-income/{id}", SimfinIncomeByID).Methods("GET")
 	router.HandleFunc("/blue-lion/read/simfin-income", SimfinIncomeByTicker).Queries("ticker", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/income", IncomeByTicker).Queries("ticker", "").Methods("GET")
@@ -43,7 +44,6 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/enriched-mergers-journal", EnrichedMergersJournalByMergerID).Queries("mergerId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-projections/{id}", EnrichedProjectionsByID).Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-projections", EnrichedProjectionsBySymbol).Queries("symbol", "").Methods("GET")
-	router.HandleFunc("/blue-lion/read/enriched-projections", EnrichedProjections).Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-projections-journal", EnrichedProjectionsJournalByProjectionsID).Queries("projectionsId", "").Methods("GET")
 	router.Methods("GET").Path("/blue-lion/read/scalar").HandlerFunc(Scalar)
 }
@@ -131,10 +131,9 @@ func EnrichedProjectionsBySymbol(w http.ResponseWriter, r *http.Request) {
 	p := api.JsonProjections{}
 	err = db.Get(&p, api.JsonToSelect(p, "projections", "")+fmt.Sprintf(" WHERE ref_data_id=%d", refDataID))
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
-		return
+		api.ProjectionsBySymbol(args.Symbol, &p)
 	}
-	ep, err := EnrichProjections(p)
+	ep, err := api.EnrichProjections(p)
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
@@ -142,99 +141,6 @@ func EnrichedProjectionsBySymbol(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(&ep)
 	cmn.Exit("Read-EnrichedProjectionsBySymbol", ep)
-}
-
-func EnrichProjections(p api.JsonProjections) (api.JsonEnrichedProjections, error) {
-	ep := api.JsonEnrichedProjections{JsonProjections: p}
-
-	var refData api.JsonRefData
-	err := api.RefDataByID(ep.RefDataID, &refData)
-	if err != nil {
-		return ep, nil
-	}
-
-	ep.Ticker = refData.Symbol
-	ep.Description = refData.Description
-	ep.Sector = refData.Sector
-	ep.Industry = refData.Industry
-	var summary []api.JsonSummary
-	err = api.SummaryByTicker(ep.Ticker, &summary)
-	if err != nil {
-		return ep, nil
-	}
-
-	HeadlineFromSummary(summary, &ep.PEHighMMO5yr, &ep.PELowMMO5yr, &ep.EPSCagr5yr, &ep.EPSCagr10yr, &ep.ROE5yr)
-	if len(summary) > 0 && summary[0].EPS > 0.0 && ep.EPSYr2 > 0.0 {
-		ep.EPSCagr2yr = math.Pow(ep.EPSYr2/summary[0].EPS, 0.5) - 1.0
-	}
-	if len(summary) > 5 && summary[5].EPS > 0.0 && ep.EPSYr2 > 0.0 {
-		ep.EPSCagr7yr = math.Pow(ep.EPSYr2/summary[5].EPS, 0.142857143) - 1.0
-	}
-
-	var md api.JsonMarketData
-	err = api.MarketDataBySymbol(ep.Ticker, &md)
-
-	// Don't pass the error up, it's ok if we don't get market data, we just can't calculate those fields
-	if err == nil && md.Last > 0.0 {
-		ep.Price = md.Last
-		if ep.EPS > 0.0 {
-			ep.PE = ep.Price / ep.EPS
-		}
-		ep.EPSYield = ep.EPS / ep.Price
-		ep.DPSYield = ep.DPS / ep.Price
-		ep.DivPlusGrowth = ep.DPSYield + ep.Growth
-		ep.CAGR5yr = Cagr(5.0, ep.JsonProjections, md)
-		ep.CROE5yr = Croe(5.0, ep.JsonProjections, md)
-		ep.CAGR10yr = Cagr(10.0, ep.JsonProjections, md)
-		ep.CROE10yr = Croe(10.0, ep.JsonProjections, md)
-	}
-
-	if len(summary) >= 5 {
-		ep.Magic = ep.CAGR5yr
-		for i := 0; i < 5; i++ {
-			if summary[i].NetMgn < 0.10 || summary[i].LTDRatio > 3.5 || summary[i].EPS <= 0.0 {
-				ep.Magic = 0.0
-				break
-			}
-		}
-	}
-
-	return ep, nil
-}
-
-func EnrichedProjections(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-EnrichedProjections", w, r.URL.Query())
-
-	db, err := cmn.DbConnect()
-	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
-		return
-	}
-
-	foo := api.JsonProjections{}
-	var projections []api.JsonProjections
-	err = db.Select(&projections, api.JsonToSelect(foo, "projections", ""))
-	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
-		return
-	}
-
-	var ret []api.JsonEnrichedProjections
-	for p := range projections {
-		ep, err := EnrichProjections(projections[p])
-		if err != nil {
-			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
-			return
-		}
-		ret = append(ret, ep)
-	}
-
-	sort.Slice(ret, func(i, j int) bool {
-		return ret[i].CAGR5yr > ret[j].CAGR5yr
-	})
-
-	json.NewEncoder(w).Encode(&ret)
-	cmn.Exit("Read-EnrichedProjections", &ret)
 }
 
 func EnrichedProjectionsByID(w http.ResponseWriter, r *http.Request) {
@@ -255,7 +161,7 @@ func EnrichedProjectionsByID(w http.ResponseWriter, r *http.Request) {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
-	ep, err := EnrichProjections(p)
+	ep, err := api.EnrichProjections(p)
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
@@ -306,6 +212,68 @@ func EnrichedProjectionsJournalByProjectionsID(w http.ResponseWriter, r *http.Re
 func ProjectionsByID(w http.ResponseWriter, r *http.Request) {
 	var ret api.JsonProjections
 	RestHandleGet(w, r, "Read-ProjectionsBySymbol", &ret, ret, "projections")
+}
+
+func ProjectionsBySymbol(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-ProjectionsBySymbol", w, r.URL.Query())
+
+	args := new(cmn.RestSymbolInput)
+	decoder := schema.NewDecoder()
+	err := decoder.Decode(args, r.URL.Query())
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		return
+	}
+
+	refDataID, err := api.SymbolToRefDataID(args.Symbol)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	db, err := cmn.DbConnect()
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	var ret api.JsonProjections
+	err = db.Get(&ret, fmt.Sprintf("%s WHERE ref_data_id=%d ORDER BY id DESC LIMIT 1", api.JsonToSelect(ret, "projections", ""), refDataID))
+	if err != nil {
+		ret.RefDataID = refDataID
+		ret.Confidence = "N"
+		var summary []api.JsonSummary
+		err = api.SummaryByTicker(args.Symbol, &summary)
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if len(summary) > 0 {
+			ret.Date = summary[0].ReportDate
+			ret.EPS = summary[0].EPS
+			ret.DPS = summary[0].DPS
+			ret.Payout = ret.DPS / ret.EPS
+
+			var epsCagr5yr, epsCagr10yr, roe5yr float64
+			var peHighMmo5yr, peLowMmo5yr int
+			api.HeadlineFromSummary(summary, &peHighMmo5yr, &peLowMmo5yr, &epsCagr5yr, &epsCagr10yr, &roe5yr)
+			ret.Growth = epsCagr5yr
+			ret.ROE = roe5yr
+			ret.PETerminal = (peHighMmo5yr + peLowMmo5yr) / 2
+			if ret.PETerminal > 18.0 { // Cap PETerminal at 18
+				ret.PETerminal = 18.0
+			}
+			ret.EPSYr1 = ret.EPS * (1.0 + epsCagr5yr)
+			ret.EPSYr2 = ret.EPSYr1 * (1.0 + epsCagr5yr)
+		} else {
+			ret.Date = "1900-01-01T00:00:00Z"
+		}
+	}
+
+	json.NewEncoder(w).Encode(&ret)
+	cmn.Exit("Read-ProjectionsBySymbol", &ret)
 }
 
 func MarketData(w http.ResponseWriter, r *http.Request) {
@@ -875,79 +843,6 @@ func CashflowByTicker(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(&ret)
 
 	cmn.Exit("CashflowByTicker", ret)
-}
-
-func Cagr(years float64, projections api.JsonProjections, md api.JsonMarketData) float64 {
-	if projections.EPS <= 0.0 || projections.Growth <= 0.0 || projections.PETerminal <= 0.0 || md.Last <= 0.0 {
-		return 0.0
-	}
-	divBucket := 0.0
-	divGrowth, _ := api.Scalar(api.CONST_DIV_GROWTH)
-	eps := projections.EPS
-	for i := 0.0; i < years; i++ {
-		divBucket = divBucket * (1.0 + divGrowth)
-		divBucket = divBucket + (eps * projections.Payout)
-		eps = eps * (1.0 + projections.Growth)
-	}
-	ret := math.Pow(((eps*float64(projections.PETerminal))+divBucket)/md.Last, 1.0/years) - 1.0
-	return math.Round(ret*100000000) / 100000000
-}
-
-func Croe(years float64, projections api.JsonProjections, md api.JsonMarketData) float64 {
-	if projections.Book <= 0.0 || projections.ROE <= 0.0 || projections.PETerminal <= 0.0 || md.Last <= 0.0 {
-		return 0.0
-	}
-	divBucket := 0.0
-	divGrowth, _ := api.Scalar(api.CONST_DIV_GROWTH)
-	book := projections.Book
-	eps := 0.0
-	for i := 0.0; i < years; i++ {
-		divBucket = divBucket * (1.0 + divGrowth)
-		eps = book * projections.ROE
-		div := eps * projections.Payout
-		divBucket += div
-		book += eps - div
-	}
-	ret := math.Pow(((eps*float64(projections.PETerminal))+divBucket)/md.Last, 1.0/years) - 1.0
-	return math.Round(ret*100000000) / 100000000
-}
-
-func HeadlineFromSummary(summary []api.JsonSummary, peHighMmo5yr *int, peLowMmo5yr *int, epsCagr5yr *float64, epsCagr10yr *float64, roe5yr *float64) {
-	var sumRoe5yr float64
-	var sumH, sumL, maxH, maxL, minH, minL int
-	minH = math.MaxInt64
-	minL = math.MaxInt64
-	if len(summary) > 6 && summary[0].EPS > 0.0 && summary[1].EPS > 0.0 && summary[5].EPS > 0.0 && summary[6].EPS > 0.0 {
-		first := ((summary[5].EPS + summary[6].EPS) / 2.0)
-		last := ((summary[0].EPS + summary[1].EPS) / 2.0)
-		*epsCagr5yr = math.Pow(last/first, 0.2) - 1.0
-	}
-	if len(summary) > 10 && summary[0].EPS > 0.0 && summary[10].EPS > 0.0 {
-		*epsCagr10yr = math.Pow(summary[0].EPS/summary[10].EPS, 0.1) - 1.0
-	}
-
-	if len(summary) > 4 {
-		for i := 0; i < 5; i++ {
-			if summary[i].PEHigh > maxH {
-				maxH = summary[i].PEHigh
-			}
-			if summary[i].PELow > maxL {
-				maxL = summary[i].PELow
-			}
-			if summary[i].PEHigh < minH {
-				minH = summary[i].PEHigh
-			}
-			if summary[i].PELow < minL {
-				minL = summary[i].PELow
-			}
-			sumH += summary[i].PEHigh
-			sumL += summary[i].PELow
-			sumRoe5yr += summary[i].ROE
-		}
-		*peHighMmo5yr = int(math.Round(float64(sumH-maxH-minH) / 3.0))
-		*peLowMmo5yr = int(math.Round(float64(sumL-maxL-minL) / 3.0))
-		*roe5yr = sumRoe5yr / 5.0
-	}
 }
 
 func SummaryByTicker(w http.ResponseWriter, r *http.Request) {
