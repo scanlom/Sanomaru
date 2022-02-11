@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"log"
 	"reflect"
 	"strings"
 )
@@ -52,7 +53,7 @@ type JsonProjections struct {
 	ROE        float64 `json:"roe" db:"roe"`
 	EPSYr1     float64 `json:"epsYr1" db:"eps_yr1"`
 	EPSYr2     float64 `json:"epsYr2" db:"eps_yr2"`
-	Confidence string `json:"confidence" db:"confidence"`
+	Confidence string  `json:"confidence" db:"confidence"`
 }
 
 type JsonMDHYearSummary struct {
@@ -210,29 +211,35 @@ type JsonHeadline struct {
 type JsonEnrichedProjections struct {
 	JsonProjections
 	// Ref Data
-	Ticker      string  `json:"ticker"`
-	Description string  `json:"description"`
-	Sector      string  `json:"sector"`
-	Industry    string  `json:"industry"`
-	Price       float64 `json:"price"`
+	Ticker      string  `json:"ticker" db:"ticker"`
+	Description string  `json:"description" db:"description"`
+	Sector      string  `json:"sector" db:"sector"`
+	Industry    string  `json:"industry" db:"industry"`
+	Price       float64 `json:"price" db:"price"`
 	// Derived - Financials
-	EPSCagr5yr   float64 `json:"epsCagr5yr"`
-	EPSCagr10yr  float64 `json:"epsCagr10yr"`
-	PEHighMMO5yr int     `json:"peHighMmo5yr"`
-	PELowMMO5yr  int     `json:"peLowMmo5yr"`
-	ROE5yr       float64 `json:"roe5yr"`
+	EPSCagr5yr   float64 `json:"epsCagr5yr" db:"eps_cagr_5yr"`
+	EPSCagr10yr  float64 `json:"epsCagr10yr" db:"eps_cagr_10yr"`
+	PEHighMMO5yr int     `json:"peHighMmo5yr" db:"pe_high_mmo_5yr"`
+	PELowMMO5yr  int     `json:"peLowMmo5yr" db:"pe_low_mmo_5yr"`
+	ROE5yr       float64 `json:"roe5yr" db:"roe_5yr"`
 	// Derived - Projections
-	PE            float64 `json:"pe"`
-	EPSCagr2yr    float64 `json:"epsCagr2yr"`
-	EPSCagr7yr    float64 `json:"epsCagr7yr"`
-	DivPlusGrowth float64 `json:"divPlusGrowth"`
-	EPSYield      float64 `json:"epsYield"`
-	DPSYield      float64 `json:"dpsYield"`
-	CAGR5yr       float64 `json:"cagr5yr"`
-	CAGR10yr      float64 `json:"cagr10yr"`
-	CROE5yr       float64 `json:"croe5yr"`
-	CROE10yr      float64 `json:"croe10yr"`
-	Magic         float64 `json:"magic"`
+	PE            float64 `json:"pe" db:"pe"`
+	EPSCagr2yr    float64 `json:"epsCagr2yr" db:"eps_cagr_2yr"`
+	EPSCagr7yr    float64 `json:"epsCagr7yr" db:"eps_cagr_7yr"`
+	DivPlusGrowth float64 `json:"divPlusGrowth" db:"div_plus_growth"`
+	EPSYield      float64 `json:"epsYield" db:"eps_yield"`
+	DPSYield      float64 `json:"dpsYield" db:"dps_yield"`
+	CAGR5yr       float64 `json:"cagr5yr" db:"cagr_5yr"`
+	CAGR10yr      float64 `json:"cagr10yr" db:"cagr_10yr"`
+	CROE5yr       float64 `json:"croe5yr" db:"croe_5yr"`
+	CROE10yr      float64 `json:"croe10yr" db:"croe_10yr"`
+	Magic         float64 `json:"magic" db:"magic"`
+}
+
+type JsonEnrichedProjectionsJournal struct {
+	JsonEnrichedProjections
+	ProjectionsID int    `json:"projectionsId" db:"projections_id"`
+	Entry         string `json:"entry" db:"entry"`
 }
 
 type JsonSummary struct {
@@ -355,5 +362,6 @@ func JsonToSelect(val interface{}, table string, prefix string) string {
 	if len(prefix) > 0 {
 		ret += " " + prefix
 	}
+	log.Println(ret)
 	return ret
 }

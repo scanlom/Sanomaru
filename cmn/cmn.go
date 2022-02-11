@@ -5,6 +5,7 @@ import (
 	"math"
 	"net/http"
 	"runtime"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
@@ -71,6 +72,11 @@ func DbConnect() (*sqlx.DB, error) {
 
 func Round(x, unit float64) float64 {
 	return math.Round(x/unit) * unit
+}
+
+func DateStringToTime(date string) time.Time {
+	t, _ := time.Parse("2006-01-02T15:04:05Z", date) 
+	return t
 }
 
 func CorsMiddleware(next http.Handler) http.Handler {

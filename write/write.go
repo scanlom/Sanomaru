@@ -28,6 +28,7 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/write/simfin-cashflow/{id}", SimfinCashflowByIDDelete).Methods("DELETE")
 	router.HandleFunc("/blue-lion/write/mergers/{id}", MergersByID).Methods("PUT")
 	router.HandleFunc("/blue-lion/write/enriched-mergers-journal", EnrichedMergersJournal).Methods("POST")
+	router.HandleFunc("/blue-lion/write/enriched-projections-journal", EnrichedProjectionsJournal).Methods("POST")
 }
 
 func RestHandlePost(w http.ResponseWriter, r *http.Request, msg string, ptr interface{}, obj interface{}, table string) {
@@ -243,6 +244,45 @@ func EnrichedMergersJournal(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(&ret)
 	cmn.Exit("Write-EnrichedMergersJournal", &ret)
+}
+
+func EnrichedProjectionsJournal(w http.ResponseWriter, r *http.Request) {
+	var input api.JsonEnrichedProjectionsJournal
+	cmn.Enter("Write-EnrichedProjectionsJournal", w, r.URL.Query())
+
+	err := json.NewDecoder(r.Body).Decode(&input)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+	cmn.LogPost("Write-EnrichedProjectionsJournal", input)
+
+	// We've been passed the projectionsId and entry, retrieve other info directly from the mergers table
+	var ep api.JsonEnrichedProjections
+	err = api.EnrichedProjectionsByID(input.ProjectionsID, &ep)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+	ret := api.JsonEnrichedProjectionsJournal{JsonEnrichedProjections: ep}
+	ret.ProjectionsID = ret.ID
+	ret.ID = 0
+	ret.Entry = input.Entry
+
+	db, err := cmn.DbConnect()
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	_, err = db.NamedExec(api.JsonToNamedInsert(ret, "projections_journal"), &ret)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(&ret)
+	cmn.Exit("Write-EnrichedProjectionsJournal", &ret)
 }
 
 func main() {

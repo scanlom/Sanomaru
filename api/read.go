@@ -181,3 +181,10 @@ func EnrichedMergersByID(id int, ret *JsonEnrichedMerger) error {
 		ret,
 	)
 }
+
+func EnrichedProjectionsByID(id int, ret *JsonEnrichedProjections) error {
+	return RestGetByUrl("EnrichedProjectionsByID",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/enriched-projections/%d", id),
+		ret,
+	)
+}

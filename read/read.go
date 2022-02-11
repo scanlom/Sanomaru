@@ -27,7 +27,6 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/ref-data", RefDataBySymbol).Queries("symbol", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/ref-data", RefData).Methods("GET")
 	router.HandleFunc("/blue-lion/read/projections/{id}", ProjectionsByID).Methods("GET")
-	router.HandleFunc("/blue-lion/read/projections", ProjectionsBySymbol).Queries("symbol", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/simfin-income/{id}", SimfinIncomeByID).Methods("GET")
 	router.HandleFunc("/blue-lion/read/simfin-income", SimfinIncomeByTicker).Queries("ticker", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/income", IncomeByTicker).Queries("ticker", "").Methods("GET")
@@ -38,13 +37,14 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/simfin-cashflow", SimfinCashflowByTicker).Queries("ticker", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/cashflow", CashflowByTicker).Queries("ticker", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/summary", SummaryByTicker).Queries("ticker", "").Methods("GET")
-	router.HandleFunc("/blue-lion/read/headline", HeadlineByTicker).Queries("ticker", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/mergers", Mergers).Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-mergers", EnrichedMergers).Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-mergers/{id}", EnrichedMergersByID).Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-mergers-journal", EnrichedMergersJournalByMergerID).Queries("mergerId", "").Methods("GET")
+	router.HandleFunc("/blue-lion/read/enriched-projections/{id}", EnrichedProjectionsByID).Methods("GET")
+	router.HandleFunc("/blue-lion/read/enriched-projections", EnrichedProjectionsBySymbol).Queries("symbol", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-projections", EnrichedProjections).Methods("GET")
-	//router.HandleFunc("/blue-lion/read/enriched-projections/{id}", EnrichedProjectionsByID).Methods("GET")
+	router.HandleFunc("/blue-lion/read/enriched-projections-journal", EnrichedProjectionsJournalByProjectionsID).Queries("projectionsId", "").Methods("GET")
 	router.Methods("GET").Path("/blue-lion/read/scalar").HandlerFunc(Scalar)
 }
 
@@ -105,8 +105,8 @@ func RestHandleGetBySymbol(w http.ResponseWriter, r *http.Request, msg string, p
 	cmn.Exit(msg, ptr)
 }
 
-func ProjectionsBySymbol(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-ProjectionsBySymbol", w, r.URL.Query())
+func EnrichedProjectionsBySymbol(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-EnrichedProjectionsBySymbol", w, r.URL.Query())
 
 	args := new(cmn.RestSymbolInput)
 	decoder := schema.NewDecoder()
@@ -128,42 +128,78 @@ func ProjectionsBySymbol(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var ret api.JsonProjections
-	err = db.Get(&ret, fmt.Sprintf("%s WHERE ref_data_id=%d ORDER BY id DESC LIMIT 1", api.JsonToSelect(ret, "projections", ""), refDataID))
+	p := api.JsonProjections{}
+	err = db.Get(&p, api.JsonToSelect(p, "projections", "")+fmt.Sprintf(" WHERE ref_data_id=%d", refDataID))
 	if err != nil {
-		log.Println(err)
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+	ep, err := EnrichProjections(p)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
 
-		var summary []api.JsonSummary
-		err = api.SummaryByTicker(args.Symbol, &summary)
-		if err != nil {
-			log.Println(err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
+	json.NewEncoder(w).Encode(&ep)
+	cmn.Exit("Read-EnrichedProjectionsBySymbol", ep)
+}
+
+func EnrichProjections(p api.JsonProjections) (api.JsonEnrichedProjections, error) {
+	ep := api.JsonEnrichedProjections{JsonProjections: p}
+
+	var refData api.JsonRefData
+	err := api.RefDataByID(ep.RefDataID, &refData)
+	if err != nil {
+		return ep, nil
+	}
+
+	ep.Ticker = refData.Symbol
+	ep.Description = refData.Description
+	ep.Sector = refData.Sector
+	ep.Industry = refData.Industry
+	var summary []api.JsonSummary
+	err = api.SummaryByTicker(ep.Ticker, &summary)
+	if err != nil {
+		return ep, nil
+	}
+
+	HeadlineFromSummary(summary, &ep.PEHighMMO5yr, &ep.PELowMMO5yr, &ep.EPSCagr5yr, &ep.EPSCagr10yr, &ep.ROE5yr)
+	if len(summary) > 0 && summary[0].EPS > 0.0 && ep.EPSYr2 > 0.0 {
+		ep.EPSCagr2yr = math.Pow(ep.EPSYr2/summary[0].EPS, 0.5) - 1.0
+	}
+	if len(summary) > 5 && summary[5].EPS > 0.0 && ep.EPSYr2 > 0.0 {
+		ep.EPSCagr7yr = math.Pow(ep.EPSYr2/summary[5].EPS, 0.142857143) - 1.0
+	}
+
+	var md api.JsonMarketData
+	err = api.MarketDataBySymbol(ep.Ticker, &md)
+
+	// Don't pass the error up, it's ok if we don't get market data, we just can't calculate those fields
+	if err == nil && md.Last > 0.0 {
+		ep.Price = md.Last
+		if ep.EPS > 0.0 {
+			ep.PE = ep.Price / ep.EPS
 		}
+		ep.EPSYield = ep.EPS / ep.Price
+		ep.DPSYield = ep.DPS / ep.Price
+		ep.DivPlusGrowth = ep.DPSYield + ep.Growth
+		ep.CAGR5yr = Cagr(5.0, ep.JsonProjections, md)
+		ep.CROE5yr = Croe(5.0, ep.JsonProjections, md)
+		ep.CAGR10yr = Cagr(10.0, ep.JsonProjections, md)
+		ep.CROE10yr = Croe(10.0, ep.JsonProjections, md)
+	}
 
-		if len(summary) > 0 {
-			ret.RefDataID = refDataID
-			ret.Date = summary[0].ReportDate
-			ret.EPS = summary[0].EPS
-			ret.DPS = summary[0].DPS
-			ret.Payout = ret.DPS / ret.EPS
-
-			var epsCagr5yr, epsCagr10yr, roe5yr float64
-			var peHighMmo5yr, peLowMmo5yr int
-			HeadlineFromSummary(summary, &peHighMmo5yr, &peLowMmo5yr, &epsCagr5yr, &epsCagr10yr, &roe5yr)
-			ret.Growth = epsCagr5yr
-			ret.ROE = roe5yr
-			ret.PETerminal = (peHighMmo5yr + peLowMmo5yr) / 2
-			if ret.PETerminal > 18.0 { // Cap PETerminal at 18
-				ret.PETerminal = 18.0
+	if len(summary) >= 5 {
+		ep.Magic = ep.CAGR5yr
+		for i := 0; i < 5; i++ {
+			if summary[i].NetMgn < 0.10 || summary[i].LTDRatio > 3.5 || summary[i].EPS <= 0.0 {
+				ep.Magic = 0.0
+				break
 			}
-			ret.EPSYr1 = ret.EPS * (1.0 + epsCagr5yr)
-			ret.EPSYr2 = ret.EPSYr1 * (1.0 + epsCagr5yr)
 		}
 	}
 
-	json.NewEncoder(w).Encode(&ret)
-	cmn.Exit("Read-ProjectionsBySymbol", &ret)
+	return ep, nil
 }
 
 func EnrichedProjections(w http.ResponseWriter, r *http.Request) {
@@ -185,65 +221,86 @@ func EnrichedProjections(w http.ResponseWriter, r *http.Request) {
 
 	var ret []api.JsonEnrichedProjections
 	for p := range projections {
-		ep := api.JsonEnrichedProjections{JsonProjections: projections[p]}
-
-		var refData api.JsonRefData
-		err = api.RefDataByID(ep.RefDataID, &refData)
+		ep, err := EnrichProjections(projections[p])
 		if err != nil {
 			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 			return
 		}
-
-		ep.Ticker = refData.Symbol
-		ep.Description = refData.Description
-		ep.Sector = refData.Sector
-		ep.Industry = refData.Industry
-		var summary []api.JsonSummary
-		err = api.SummaryByTicker(ep.Ticker, &summary)
-		if err != nil {
-			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
-			return
-		}
-	
-		HeadlineFromSummary(summary, &ep.PEHighMMO5yr, &ep.PELowMMO5yr, &ep.EPSCagr5yr, &ep.EPSCagr10yr, &ep.ROE5yr)
-		if len(summary) > 0 && summary[0].EPS > 0.0 && ep.EPSYr2 > 0.0 {
-			ep.EPSCagr2yr = math.Pow(ep.EPSYr2/summary[0].EPS, 0.5) - 1.0
-		}
-		if len(summary) > 5 && summary[5].EPS > 0.0 && ep.EPSYr2 > 0.0 {
-			ep.EPSCagr7yr = math.Pow(ep.EPSYr2/summary[5].EPS, 0.142857143) - 1.0
-		}
-	
-		var md api.JsonMarketData
-		err = api.MarketDataBySymbol(ep.Ticker, &md)
-		if err == nil && md.Last > 0.0 {
-			ep.Price = md.Last
-			if ep.EPS > 0.0 {
-				ep.PE = ep.Price / ep.EPS
-			}
-			ep.EPSYield = ep.EPS / ep.Price
-			ep.DPSYield = ep.DPS / ep.Price
-			ep.DivPlusGrowth = ep.DPSYield + ep.Growth
-			ep.CAGR5yr = Cagr(5.0, ep.JsonProjections, md)
-			ep.CROE5yr = Croe(5.0, ep.JsonProjections, md)
-			ep.CAGR10yr = Cagr(10.0, ep.JsonProjections, md)
-			ep.CROE10yr = Croe(10.0, ep.JsonProjections, md)
-		}
-	
-		if len(summary) >= 5 {
-			ep.Magic = ep.CAGR5yr
-			for i := 0; i < 5; i++ {
-				if summary[i].NetMgn < 0.10 || summary[i].LTDRatio > 3.5 || summary[i].EPS <= 0.0 {
-					ep.Magic = 0.0
-					break
-				}
-			}
-		}
-
 		ret = append(ret, ep)
 	}
 
+	sort.Slice(ret, func(i, j int) bool {
+		return ret[i].CAGR5yr > ret[j].CAGR5yr
+	})
+
 	json.NewEncoder(w).Encode(&ret)
 	cmn.Exit("Read-EnrichedProjections", &ret)
+}
+
+func EnrichedProjectionsByID(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-EnrichedProjectionsByID", w, r.URL.Query())
+
+	params := mux.Vars(r)
+	id := params["id"]
+
+	db, err := cmn.DbConnect()
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	p := api.JsonProjections{}
+	err = db.Get(&p, api.JsonToSelect(p, "projections", "")+fmt.Sprintf(" WHERE id=%s", id))
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+	ep, err := EnrichProjections(p)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(&ep)
+
+	cmn.Exit("Read-EnrichedProjectionsByID", ep)
+}
+
+type EnrichedProjectionsJournalByProjectionsIDInput struct {
+	ProjectionsID int `schema:"projectionsId"`
+}
+
+func EnrichedProjectionsJournalByProjectionsID(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-EnrichedProjectionsJournalByProjectionsID", w, r.URL.Query())
+
+	args := new(EnrichedProjectionsJournalByProjectionsIDInput)
+	decoder := schema.NewDecoder()
+	err := decoder.Decode(args, r.URL.Query())
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		return
+	}
+
+	db, err := cmn.DbConnect()
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	ret := []api.JsonEnrichedProjectionsJournal{}
+	err = db.Select(&ret, api.JsonToSelect(api.JsonEnrichedProjectionsJournal{}, "projections_journal", "")+fmt.Sprintf(" WHERE projections_id=%d ORDER BY id DESC", args.ProjectionsID))
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	sort.Slice(ret, func(i, j int) bool {
+		return cmn.DateStringToTime(ret[i].Date).Before(cmn.DateStringToTime(ret[j].Date))
+	})
+
+	json.NewEncoder(w).Encode(&ret)
+
+	cmn.Exit("Read-EnrichedProjectionsJournalByProjectionsID", ret)
 }
 
 func ProjectionsByID(w http.ResponseWriter, r *http.Request) {
@@ -820,10 +877,6 @@ func CashflowByTicker(w http.ResponseWriter, r *http.Request) {
 	cmn.Exit("CashflowByTicker", ret)
 }
 
-type HeadlineInput struct {
-	Ticker string `schema:"ticker"`
-}
-
 func Cagr(years float64, projections api.JsonProjections, md api.JsonMarketData) float64 {
 	if projections.EPS <= 0.0 || projections.Growth <= 0.0 || projections.PETerminal <= 0.0 || md.Last <= 0.0 {
 		return 0.0
@@ -895,85 +948,6 @@ func HeadlineFromSummary(summary []api.JsonSummary, peHighMmo5yr *int, peLowMmo5
 		*peLowMmo5yr = int(math.Round(float64(sumL-maxL-minL) / 3.0))
 		*roe5yr = sumRoe5yr / 5.0
 	}
-}
-
-func HeadlineByTicker(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-HeadlineByTicker", w, r.URL.Query())
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-
-	args := new(HeadlineInput)
-	decoder := schema.NewDecoder()
-	err := decoder.Decode(args, r.URL.Query())
-	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
-		return
-	}
-
-	var refData api.JsonRefData
-	err = api.RefDataBySymbol(args.Ticker, &refData)
-	if err != nil {
-		log.Println(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	var summary []api.JsonSummary
-	err = api.SummaryByTicker(args.Ticker, &summary)
-	if err != nil {
-		log.Println(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	var epsCagr5yr, epsCagr10yr, epsCagr2yr, epsCagr7yr, roe5yr float64
-	var price, pe, divPlusGrowth, epsYield, dpsYield, cagr5yr, cagr10yr, croe5yr, croe10yr, magic float64
-	var peHighMmo5yr, peLowMmo5yr int
-	HeadlineFromSummary(summary, &peHighMmo5yr, &peLowMmo5yr, &epsCagr5yr, &epsCagr10yr, &roe5yr)
-
-	var projections api.JsonProjections
-	err = api.ProjectionsBySymbol(args.Ticker, &projections)
-	if err == nil {
-		if len(summary) > 0 && summary[0].EPS > 0.0 && projections.EPSYr2 > 0.0 {
-			epsCagr2yr = math.Pow(projections.EPSYr2/summary[0].EPS, 0.5) - 1.0
-		}
-		if len(summary) > 5 && summary[5].EPS > 0.0 && projections.EPSYr2 > 0.0 {
-			epsCagr7yr = math.Pow(projections.EPSYr2/summary[5].EPS, 0.142857143) - 1.0
-		}
-	}
-
-	var md api.JsonMarketData
-	err = api.MarketDataBySymbol(args.Ticker, &md)
-	if err == nil && md.Last > 0.0 {
-		price = md.Last
-		if projections.EPS > 0.0 {
-			pe = price / projections.EPS
-		}
-		epsYield = projections.EPS / price
-		dpsYield = projections.DPS / price
-		divPlusGrowth = dpsYield + projections.Growth
-		cagr5yr = Cagr(5.0, projections, md)
-		croe5yr = Croe(5.0, projections, md)
-		cagr10yr = Cagr(10.0, projections, md)
-		croe10yr = Croe(10.0, projections, md)
-	}
-
-	if len(summary) >= 5 {
-		magic = cagr5yr
-		for i := 0; i < 5; i++ {
-			if summary[i].NetMgn < 0.10 || summary[i].LTDRatio > 3.5 || summary[i].EPS <= 0.0 {
-				magic = 0.0
-				break
-			}
-		}
-	}
-
-	ret := api.JsonHeadline{Ticker: args.Ticker, Description: refData.Description, Sector: refData.Sector, Industry: refData.Industry,
-		EPSCagr5yr: epsCagr5yr, EPSCagr10yr: epsCagr10yr, EPSCagr2yr: epsCagr2yr, EPSCagr7yr: epsCagr7yr, PEHighMMO5yr: peHighMmo5yr, PELowMMO5yr: peLowMmo5yr, ROE5yr: roe5yr,
-		Price: price, PE: pe, DivPlusGrowth: divPlusGrowth, EPSYield: epsYield, DPSYield: dpsYield, CAGR5yr: cagr5yr, CAGR10yr: cagr10yr, CROE5yr: croe5yr, CROE10yr: croe10yr,
-		Magic: magic}
-	json.NewEncoder(w).Encode(&ret)
-
-	cmn.Exit("Read-HeadlineByTicker", ret)
 }
 
 func SummaryByTicker(w http.ResponseWriter, r *http.Request) {
@@ -1084,7 +1058,7 @@ func Mergers(w http.ResponseWriter, r *http.Request) {
 	cmn.Exit("Read-Mergers", ret)
 }
 
-func EnrichMerger(m api.JsonMerger)(api.JsonEnrichedMerger, error) {
+func EnrichMerger(m api.JsonMerger) (api.JsonEnrichedMerger, error) {
 	em := api.JsonEnrichedMerger{JsonMerger: m}
 	var acquirer api.JsonRefData
 	err := api.RefDataByID(em.AcquirerRefDataID, &acquirer)
@@ -1109,16 +1083,16 @@ func EnrichMerger(m api.JsonMerger)(api.JsonEnrichedMerger, error) {
 
 	fees := 0.005
 	if strings.Contains(em.TargetTicker, ".HK") {
-		fees = (0.0008 + 0.0013)*md.Last // 8 bps commison and 13 bps stamp on each side
+		fees = (0.0008 + 0.0013) * md.Last // 8 bps commison and 13 bps stamp on each side
 	}
 
 	em.MarketPositiveReturn = cmn.Round((em.DealPrice+em.Dividends-fees)/md.Last-1, 0.0001)
-	em.MarketNetReturn = cmn.Round( 
-		((em.DealPrice+em.Dividends-fees-md.Last)*em.Confidence-(md.Last-em.FailPrice-em.Dividends+2*fees)*(1-em.Confidence)) / md.Last, 0.0001)
-	close_time, _ := time.Parse("2006-01-02T15:04:05Z", em.CloseDate)
+	em.MarketNetReturn = cmn.Round(
+		((em.DealPrice+em.Dividends-fees-md.Last)*em.Confidence-(md.Last-em.FailPrice-em.Dividends+2*fees)*(1-em.Confidence))/md.Last, 0.0001)
+	close_time := cmn.DateStringToTime(em.CloseDate)
 	annualize_multiple := 365 / (close_time.Sub(time.Now()).Hours() / 24)
-	em.MarketPositiveReturnAnnualized = cmn.Round( annualize_multiple * em.MarketPositiveReturn, 0.0001)
-	em.MarketNetReturnAnnualized = cmn.Round( annualize_multiple * em.MarketNetReturn, 0.0001)
+	em.MarketPositiveReturnAnnualized = cmn.Round(annualize_multiple*em.MarketPositiveReturn, 0.0001)
+	em.MarketNetReturnAnnualized = cmn.Round(annualize_multiple*em.MarketNetReturn, 0.0001)
 	return em, nil
 }
 
@@ -1140,7 +1114,7 @@ func EnrichedMergers(w http.ResponseWriter, r *http.Request) {
 			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 			return
 		}
-	
+
 		ret = append(ret, em)
 	}
 	sort.Slice(ret, func(i, j int) bool {
@@ -1148,7 +1122,7 @@ func EnrichedMergers(w http.ResponseWriter, r *http.Request) {
 			return ret[i].MarketPositiveReturnAnnualized > ret[j].MarketPositiveReturnAnnualized
 		}
 		return ret[i].MarketNetReturnAnnualized > ret[j].MarketNetReturnAnnualized
-	  })
+	})
 	json.NewEncoder(w).Encode(&ret)
 
 	cmn.Exit("Read-EnrichedMergers", ret)
@@ -1156,7 +1130,6 @@ func EnrichedMergers(w http.ResponseWriter, r *http.Request) {
 
 func EnrichedMergersByID(w http.ResponseWriter, r *http.Request) {
 	cmn.Enter("Read-EnrichedMergersByID", w, r.URL.Query())
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	params := mux.Vars(r)
 	id := params["id"]
