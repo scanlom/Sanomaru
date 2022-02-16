@@ -27,12 +27,14 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/write/simfin-cashflow", SimfinCashflow).Methods("POST")
 	router.HandleFunc("/blue-lion/write/simfin-cashflow/{id}", SimfinCashflowByIDDelete).Methods("DELETE")
 	router.HandleFunc("/blue-lion/write/mergers/{id}", MergersByID).Methods("PUT")
+	router.HandleFunc("/blue-lion/write/enriched-mergers", EnrichedMergers).Methods("POST")
 	router.HandleFunc("/blue-lion/write/enriched-mergers-journal", EnrichedMergersJournal).Methods("POST")
 	router.HandleFunc("/blue-lion/write/enriched-projections-journal", EnrichedProjectionsJournal).Methods("POST")
+	router.HandleFunc("/blue-lion/write/portfolios/{id}", PortfoliosByID).Methods("PUT")
 }
 
 func RestHandlePost(w http.ResponseWriter, r *http.Request, msg string, ptr interface{}, obj interface{}, table string) {
-	cmn.Enter(msg, w, r.URL.Query())
+	cmn.Enter(msg, w, r)
 
 	err := json.NewDecoder(r.Body).Decode(ptr)
 	if err != nil {
@@ -58,7 +60,7 @@ func RestHandlePost(w http.ResponseWriter, r *http.Request, msg string, ptr inte
 }
 
 func RestHandlePut(w http.ResponseWriter, r *http.Request, msg string, ptr interface{}, obj interface{}, table string) {
-	cmn.Enter(msg, w, r.URL.Query())
+	cmn.Enter(msg, w, r)
 
 	params := mux.Vars(r)
 	id := params["id"]
@@ -85,7 +87,7 @@ func RestHandlePut(w http.ResponseWriter, r *http.Request, msg string, ptr inter
 }
 
 func RestHandleDelete(w http.ResponseWriter, r *http.Request, msg string, table string) {
-	cmn.Enter(msg, w, r.URL.Query())
+	cmn.Enter(msg, w, r)
 
 	params := mux.Vars(r)
 	id := params["id"]
@@ -112,7 +114,7 @@ func MarketData(w http.ResponseWriter, r *http.Request) {
 }
 
 func MarketDataByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("MarketDataByID", w, r.URL.Query())
+	cmn.Enter("MarketDataByID", w, r)
 
 	params := mux.Vars(r)
 	id := params["id"]
@@ -142,13 +144,11 @@ func MarketDataByID(w http.ResponseWriter, r *http.Request) {
 
 func MarketDataHistorical(w http.ResponseWriter, r *http.Request) {
 	var ret api.JsonMarketDataHistorical
-	log.Println(ret)
 	RestHandlePost(w, r, "Write-MarketDataHistorical", &ret, ret, "market_data_historical")
 }
 
 func MarketDataHistoricalByID(w http.ResponseWriter, r *http.Request) {
 	var ret api.JsonMarketDataHistorical
-	log.Println(ret)
 	RestHandlePut(w, r, "Write-MarketDataHistoricalByID", &ret, ret, "market_data_historical")
 }
 
@@ -159,7 +159,6 @@ func RefData(w http.ResponseWriter, r *http.Request) {
 
 func RefDataByID(w http.ResponseWriter, r *http.Request) {
 	var ret api.JsonRefData
-	log.Println(ret)
 	RestHandlePut(w, r, "Write-RefDataByID", &ret, ret, "ref_data")
 }
 
@@ -170,8 +169,12 @@ func Projections(w http.ResponseWriter, r *http.Request) {
 
 func ProjectionsByID(w http.ResponseWriter, r *http.Request) {
 	var ret api.JsonProjections
-	log.Println(ret)
 	RestHandlePut(w, r, "Write-ProjectionsByID", &ret, ret, "projections")
+}
+
+func PortfoliosByID(w http.ResponseWriter, r *http.Request) {
+	var ret api.JsonPortfolio
+	RestHandlePut(w, r, "Write-PortfoliosByID", &ret, ret, "portfolios")
 }
 
 func SimfinIncome(w http.ResponseWriter, r *http.Request) {
@@ -207,9 +210,56 @@ func MergersByID(w http.ResponseWriter, r *http.Request) {
 	RestHandlePut(w, r, "Write-MergersByID", &ret, ret, "mergers")
 }
 
+func EnrichedMergers(w http.ResponseWriter, r *http.Request) {
+	var input api.JsonEnrichedMerger
+	cmn.Enter("Write-EnrichedMergers", w, r)
+
+	err := json.NewDecoder(r.Body).Decode(&input)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+	cmn.LogPost("Write-EnrichedMergers", input)
+
+	// We've been passed the target and acquirer symbols, so need to look up the id's
+	var targetRefData api.JsonRefData
+	err = api.RefDataBySymbol(input.TargetTicker, &targetRefData)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	var acquirerRefData api.JsonRefData
+	err = api.RefDataBySymbol(input.AcquirerTicker, &acquirerRefData)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	// Aside from ref data, everything else from the merger passed in
+	ret := api.JsonMerger(input.JsonMerger)
+	ret.TargetRefDataID = targetRefData.ID
+	ret.AcquirerRefDataID = acquirerRefData.ID
+
+	db, err := cmn.DbConnect()
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	_, err = db.NamedExec(api.JsonToNamedInsert(ret, "mergers"), &ret)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(&ret)
+	cmn.Exit("Write-EnrichedMergers", &ret)
+}
+
 func EnrichedMergersJournal(w http.ResponseWriter, r *http.Request) {
 	var input api.JsonEnrichedMergerJournal
-	cmn.Enter("Write-EnrichedMergersJournal", w, r.URL.Query())
+	cmn.Enter("Write-EnrichedMergersJournal", w, r)
 
 	err := json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
@@ -248,7 +298,7 @@ func EnrichedMergersJournal(w http.ResponseWriter, r *http.Request) {
 
 func EnrichedProjectionsJournal(w http.ResponseWriter, r *http.Request) {
 	var input api.JsonEnrichedProjectionsJournal
-	cmn.Enter("Write-EnrichedProjectionsJournal", w, r.URL.Query())
+	cmn.Enter("Write-EnrichedProjectionsJournal", w, r)
 
 	err := json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
@@ -257,7 +307,7 @@ func EnrichedProjectionsJournal(w http.ResponseWriter, r *http.Request) {
 	}
 	cmn.LogPost("Write-EnrichedProjectionsJournal", input)
 
-	// We've been passed the projectionsId and entry, retrieve other info directly from the mergers table
+	// We've been passed the projectionsId and entry, retrieve other info directly from the projections table
 	var ep api.JsonEnrichedProjections
 	err = api.EnrichedProjectionsByID(input.ProjectionsID, &ep)
 	if err != nil {
@@ -265,8 +315,7 @@ func EnrichedProjectionsJournal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ret := api.JsonEnrichedProjectionsJournal{JsonEnrichedProjections: ep}
-	ret.ProjectionsID = ret.ID
-	ret.ID = 0
+	ret.Date = input.Date
 	ret.Entry = input.Entry
 
 	db, err := cmn.DbConnect()
@@ -275,6 +324,16 @@ func EnrichedProjectionsJournal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// First, tweek the date on the projections (on every journal entry the user is reaffirming the projections)
+	_, err = db.NamedExec(fmt.Sprintf("%s WHERE id=%d", api.JsonToNamedUpdate(ret.JsonProjections, "projections"), ret.ID), &ret.JsonProjections)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	// Then, insert the projections journal (remember to flip the id, as the original one is for the projections rather than the journal)
+	ret.ProjectionsID = ret.ID
+	ret.ID = 0
 	_, err = db.NamedExec(api.JsonToNamedInsert(ret, "projections_journal"), &ret)
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)

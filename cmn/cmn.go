@@ -1,6 +1,8 @@
 package cmn
 
 import (
+	"bytes"
+	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
@@ -32,9 +34,14 @@ type RestRefDataIDDateInput struct {
 
 var db *sqlx.DB
 
-func Enter(name string, w http.ResponseWriter, args interface{}) {
+func Enter(name string, w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s: Called...", name)
-	log.Printf("%s: Arguments: %v", name, args)
+	log.Printf("%s: Query Arguments: %v", name, r.URL.Query())
+	var bodyBytes []byte
+	bodyBytes, _ = ioutil.ReadAll(r.Body)
+	r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+	bodyString := string(bodyBytes)
+	log.Printf("%s: Body Arguments: %s", name, bodyString)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 }
@@ -49,7 +56,7 @@ func LogPost(name string, ret interface{}) {
 }
 
 func ErrorHttp(err error, w http.ResponseWriter, code int) {
-    function, file, line, _ := runtime.Caller(1) // Ignoring the error as we are in an error handler anyway
+	function, file, line, _ := runtime.Caller(1) // Ignoring the error as we are in an error handler anyway
 	log.Printf("ERROR: File: %s  Function: %s Line: %d", file, runtime.FuncForPC(function).Name(), line)
 	log.Printf("ERROR: %s", err)
 	w.WriteHeader(code)
@@ -75,7 +82,7 @@ func Round(x, unit float64) float64 {
 }
 
 func DateStringToTime(date string) time.Time {
-	t, _ := time.Parse("2006-01-02T15:04:05Z", date) 
+	t, _ := time.Parse("2006-01-02T15:04:05Z", date)
 	return t
 }
 

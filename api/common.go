@@ -292,6 +292,19 @@ type JsonEnrichedMergerJournal struct {
 	Entry    string `json:"entry" db:"entry"`
 }
 
+type JsonPortfolio struct {
+	ID                  int     `json:"id" db:"id"`
+	Name                string  `json:"name" db:"name"`
+	Value               float64 `json:"value" db:"value"`
+	Index               float64 `json:"index" db:"index"`
+	Divisor             float64 `json:"divisor" db:"divisor"`
+	Cash                float64 `json:"cash" db:"cash"`
+	Debt                float64 `json:"debt" db:"debt"`
+	ValueTotalCapital   float64 `json:"valueTotalCapital" db:"value_total_capital"`
+	IndexTotalCapital   float64 `json:"indexTotalCapital" db:"index_total_capital"`
+	DivisorTotalCapital float64 `json:"divisorTotalCapital" db:"divisor_total_capital"`
+}
+
 func JsonToNamedInsertInternal(t reflect.Type, cols *string, params *string) {
 	for i := 0; i < t.NumField(); i++ {
 		if t.Field(i).Type.Kind() == reflect.Struct {

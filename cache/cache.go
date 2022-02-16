@@ -13,7 +13,7 @@ import (
 
 func EnrichedProjections(cache []api.JsonEnrichedProjections, err error) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		cmn.Enter("Cache-EnrichedProjections", w, r.URL.Query())
+		cmn.Enter("Cache-EnrichedProjections", w, r)
 		if err != nil {
 			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 			return
