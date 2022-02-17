@@ -18,6 +18,11 @@ type RestSymbolInput struct {
 	Symbol string `schema:"symbol"`
 }
 
+type RestSymbolPortfolioIDInput struct {
+	Symbol      string `schema:"symbol"`
+	PortfolioID int `schema:"portfolioId"`
+}
+
 type RestTickerInput struct {
 	Ticker string `schema:"ticker"`
 }

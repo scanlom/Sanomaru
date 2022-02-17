@@ -305,6 +305,26 @@ type JsonPortfolio struct {
 	DivisorTotalCapital float64 `json:"divisorTotalCapital" db:"divisor_total_capital"`
 }
 
+type JsonPosition struct {
+	ID          int     `json:"id" db:"id"`
+	RefDataID   int     `json:"refDataId" db:"ref_data_id"`
+	PortfolioID int     `json:"portfolioId" db:"portfolio_id"`
+	Quantity    float64 `json:"quantity" db:"quantity"`
+	Price       float64 `json:"price" db:"price"`
+	Value       float64 `json:"value" db:"value"`
+	Index       float64 `json:"index" db:"index"`
+	Divisor     float64 `json:"divisor" db:"divisor"`
+	CostBasis   float64 `json:"costBasis" db:"cost_basis"`
+	Model       float64 `json:"model" db:"model"`
+	PricingType int     `json:"pricingType" db:"pricing_type"`
+}
+
+type JsonEnrichedPosition struct {
+	JsonPosition
+	Symbol      string `json:"symbol" db:"symbol"`
+	Description string `json:"description" db:"description"`
+}
+
 func JsonToNamedInsertInternal(t reflect.Type, cols *string, params *string) {
 	for i := 0; i < t.NumField(); i++ {
 		if t.Field(i).Type.Kind() == reflect.Struct {

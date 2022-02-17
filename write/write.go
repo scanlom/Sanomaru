@@ -31,6 +31,8 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/write/enriched-mergers-journal", EnrichedMergersJournal).Methods("POST")
 	router.HandleFunc("/blue-lion/write/enriched-projections-journal", EnrichedProjectionsJournal).Methods("POST")
 	router.HandleFunc("/blue-lion/write/portfolios/{id}", PortfoliosByID).Methods("PUT")
+	router.HandleFunc("/blue-lion/write/positions/{id}", PositionsByID).Methods("PUT")
+	router.HandleFunc("/blue-lion/write/positions", Positions).Methods("POST")
 }
 
 func RestHandlePost(w http.ResponseWriter, r *http.Request, msg string, ptr interface{}, obj interface{}, table string) {
@@ -175,6 +177,16 @@ func ProjectionsByID(w http.ResponseWriter, r *http.Request) {
 func PortfoliosByID(w http.ResponseWriter, r *http.Request) {
 	var ret api.JsonPortfolio
 	RestHandlePut(w, r, "Write-PortfoliosByID", &ret, ret, "portfolios")
+}
+
+func Positions(w http.ResponseWriter, r *http.Request) {
+	var ret api.JsonPosition
+	RestHandlePost(w, r, "Write-Positions", &ret, ret, "positions")
+}
+
+func PositionsByID(w http.ResponseWriter, r *http.Request) {
+	var ret api.JsonPosition
+	RestHandlePut(w, r, "Write-PositionsByID", &ret, ret, "positions")
 }
 
 func SimfinIncome(w http.ResponseWriter, r *http.Request) {
