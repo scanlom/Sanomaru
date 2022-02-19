@@ -182,6 +182,13 @@ func Positions(slice *[]JsonPosition) error {
 	)
 }
 
+func Portfolios(slice *[]JsonPortfolio) error {
+	return RestGetByUrl("Portfolios",
+		"http://localhost:8081/blue-lion/read/portfolios",
+		slice,
+	)
+}
+
 func EnrichedMergersByID(id int, ret *JsonEnrichedMerger) error {
 	return RestGetByUrl("EnrichedMergersByID",
 		fmt.Sprintf("http://localhost:8081/blue-lion/read/enriched-mergers/%d", id),

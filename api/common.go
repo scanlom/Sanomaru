@@ -303,6 +303,25 @@ type JsonPortfolio struct {
 	ValueTotalCapital   float64 `json:"valueTotalCapital" db:"value_total_capital"`
 	IndexTotalCapital   float64 `json:"indexTotalCapital" db:"index_total_capital"`
 	DivisorTotalCapital float64 `json:"divisorTotalCapital" db:"divisor_total_capital"`
+	CostBasis           float64 `json:"costBasis" db:"cost_basis"`
+}
+
+type JsonPortfolioReturns struct {
+	ID          int     `json:"id"`
+	Name        string  `json:"name" db:"name"`
+	OneDay      float64 `json:"oneDay"`
+	OneWeek     float64 `json:"oneWeek"`
+	OneMonth    float64 `json:"oneMonth"`
+	ThreeMonths float64 `json:"threeMonths"`
+	OneYear     float64 `json:"oneYear"`
+	FiveYears   float64 `json:"fiveYears"`
+	TenYears    float64 `json:"tenYears"`
+}
+
+type JsonPortfolioHistory struct {
+	JsonPortfolio
+	Date        string `json:"date" db:"date"`
+	PortfolioID int    `json:"portfolioId" db:"portfolio_id"`
 }
 
 type JsonPosition struct {

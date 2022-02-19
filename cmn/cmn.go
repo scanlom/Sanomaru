@@ -20,7 +20,7 @@ type RestSymbolInput struct {
 
 type RestSymbolPortfolioIDInput struct {
 	Symbol      string `schema:"symbol"`
-	PortfolioID int `schema:"portfolioId"`
+	PortfolioID int    `schema:"portfolioId"`
 }
 
 type RestTickerInput struct {
@@ -32,6 +32,10 @@ type RestSymbolDateInput struct {
 	Date   string `schema:"date"`
 }
 
+type RestPortfolioIDDateInput struct {
+	PortfolioID string `schema:"portfolioId"`
+	Date        string `schema:"date"`
+}
 type RestRefDataIDDateInput struct {
 	RefDataID int    `schema:"refDataId"`
 	Date      string `schema:"date"`
