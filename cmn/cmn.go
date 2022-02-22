@@ -27,6 +27,10 @@ type RestTickerInput struct {
 	Ticker string `schema:"ticker"`
 }
 
+type RestDateInput struct {
+	Date string `schema:"date"`
+}
+
 type RestSymbolDateInput struct {
 	Symbol string `schema:"symbol"`
 	Date   string `schema:"date"`
@@ -36,9 +40,14 @@ type RestPortfolioIDDateInput struct {
 	PortfolioID string `schema:"portfolioId"`
 	Date        string `schema:"date"`
 }
+
 type RestRefDataIDDateInput struct {
 	RefDataID int    `schema:"refDataId"`
 	Date      string `schema:"date"`
+}
+
+type RestStringOutput struct {
+	Value string `json:"value"`
 }
 
 var db *sqlx.DB
@@ -84,6 +93,16 @@ func DbConnect() (*sqlx.DB, error) {
 	}
 	db, err = sqlx.Connect("postgres", c)
 	return db, err
+}
+
+func DbGet(dest interface{}, query string) error {
+	db, err := DbConnect();
+	if err != nil {
+		return err
+	}
+	log.Printf("DbGet: %s", query)
+	err = db.Get(dest, query)
+	return err
 }
 
 func Round(x, unit float64) float64 {

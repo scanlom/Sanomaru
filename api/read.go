@@ -202,3 +202,12 @@ func EnrichedProjectionsByID(id int, ret *JsonEnrichedProjections) error {
 		ret,
 	)
 }
+
+func PortfoliosHistoryByDate(date string, slice *[]JsonPortfolioHistory) error {
+	return RestGetByUrl("PortfoliosHistoryByDate",
+		"http://localhost:8081/blue-lion/read/portfolios-history?date=" + date,
+		slice,
+	)
+}
+
+
