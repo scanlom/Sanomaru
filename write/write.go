@@ -34,6 +34,7 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/write/positions/{id}", PositionsByID).Methods("PUT")
 	router.HandleFunc("/blue-lion/write/positions", Positions).Methods("POST")
 	router.HandleFunc("/blue-lion/write/portfolios-history", PortfoliosHistory).Methods("POST")
+	router.HandleFunc("/blue-lion/write/positions-history", PositionsHistory).Methods("POST")
 }
 
 func RestHandlePost(w http.ResponseWriter, r *http.Request, msg string, ptr interface{}, obj interface{}, table string) {
@@ -188,6 +189,11 @@ func Positions(w http.ResponseWriter, r *http.Request) {
 func PortfoliosHistory(w http.ResponseWriter, r *http.Request) {
 	var ret api.JsonPortfolioHistory
 	RestHandlePost(w, r, "Write-PortfoliosHistory", &ret, ret, "portfolios_history")
+}
+
+func PositionsHistory(w http.ResponseWriter, r *http.Request) {
+	var ret api.JsonPositionHistory
+	RestHandlePost(w, r, "Write-PositionsHistory", &ret, ret, "positions_history")
 }
 
 func PositionsByID(w http.ResponseWriter, r *http.Request) {

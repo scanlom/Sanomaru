@@ -37,7 +37,7 @@ type RestSymbolDateInput struct {
 }
 
 type RestPortfolioIDDateInput struct {
-	PortfolioID string `schema:"portfolioId"`
+	PortfolioID int `schema:"portfolioId"`
 	Date        string `schema:"date"`
 }
 

@@ -304,6 +304,7 @@ type JsonPortfolio struct {
 	IndexTotalCapital   float64 `json:"indexTotalCapital" db:"index_total_capital"`
 	DivisorTotalCapital float64 `json:"divisorTotalCapital" db:"divisor_total_capital"`
 	CostBasis           float64 `json:"costBasis" db:"cost_basis"`
+	Active              bool    `json:"active" db:"active"`
 }
 
 type JsonPortfolioReturns struct {
@@ -316,6 +317,7 @@ type JsonPortfolioReturns struct {
 	OneYear     float64 `json:"oneYear"`
 	FiveYears   float64 `json:"fiveYears"`
 	TenYears    float64 `json:"tenYears"`
+	YearToDate  float64 `json:"yearToDate"`
 }
 
 type JsonPortfolioHistory struct {
@@ -336,12 +338,25 @@ type JsonPosition struct {
 	CostBasis   float64 `json:"costBasis" db:"cost_basis"`
 	Model       float64 `json:"model" db:"model"`
 	PricingType int     `json:"pricingType" db:"pricing_type"`
+	Active      bool    `json:"active" db:"active"`
+}
+
+type JsonPositionHistory struct {
+	JsonPosition
+	Date       string `json:"date" db:"date"`
+	PositionID int    `json:"positionId" db:"position_id"`
 }
 
 type JsonEnrichedPosition struct {
 	JsonPosition
 	Symbol      string `json:"symbol" db:"symbol"`
 	Description string `json:"description" db:"description"`
+}
+
+type JsonEnrichedPositionHistory struct {
+	JsonEnrichedPosition
+	Date       string `json:"date" db:"date"`
+	PositionID int    `json:"positionId" db:"position_id"`
 }
 
 func JsonToNamedInsertInternal(t reflect.Type, cols *string, params *string) {
