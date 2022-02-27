@@ -2,10 +2,12 @@ package api
 
 import (
 	"math"
+
+	"github.com/scanlom/Sanomaru/cmn"
 )
 
 func Cagr(years float64, projections JsonProjections, md JsonMarketData) float64 {
-	if projections.EPS <= 0.0 || projections.Growth <= 0.0 || projections.PETerminal <= 0.0 || md.Last <= 0.0 {
+	if projections.EPS <= 0.0 || projections.PETerminal <= 0.0 || md.Last <= 0.0 {
 		return 0.0
 	}
 	divBucket := 0.0
@@ -77,6 +79,10 @@ func HeadlineFromSummary(summary []JsonSummary, peHighMmo5yr *int, peLowMmo5yr *
 	}
 }
 
+func Round(x, unit float64) float64 {
+	return math.Round(x/unit) * unit
+}
+
 func EnrichProjections(p JsonProjections) (JsonEnrichedProjections, error) {
 	ep := JsonEnrichedProjections{JsonProjections: p}
 
@@ -130,6 +136,13 @@ func EnrichProjections(p JsonProjections) (JsonEnrichedProjections, error) {
 				break
 			}
 		}
+	}
+
+	var position JsonEnrichedPosition
+	err = EnrichedPositionsBySymbolPortfolioID(ep.Ticker, cmn.CONST_PORTFOLIO_SELFIE, &position)
+	// Don't pass the error up, it's ok if this isn't a position, we just populate zero
+	if err == nil {
+		ep.PercentPortfolio = position.PercentPortfolio
 	}
 
 	return ep, nil

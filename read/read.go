@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,6 +29,7 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/ref-data", RefData).Methods("GET")
 	router.HandleFunc("/blue-lion/read/projections/{id}", ProjectionsByID).Methods("GET")
 	router.HandleFunc("/blue-lion/read/projections", ProjectionsBySymbol).Queries("symbol", "").Methods("GET")
+	router.HandleFunc("/blue-lion/read/projections", Projections).Methods("GET")
 	router.HandleFunc("/blue-lion/read/simfin-income/{id}", SimfinIncomeByID).Methods("GET")
 	router.HandleFunc("/blue-lion/read/simfin-income", SimfinIncomeByTicker).Queries("ticker", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/income", IncomeByTicker).Queries("ticker", "").Methods("GET")
@@ -47,12 +49,15 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/enriched-projections-journal", EnrichedProjectionsJournalByProjectionsID).Queries("projectionsId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/portfolios/{id}", PortfoliosByID).Methods("GET")
 	router.HandleFunc("/blue-lion/read/portfolios", Portfolios).Methods("GET")
+	router.HandleFunc("/blue-lion/read/enriched-portfolios/{id}", EnrichedPortfoliosByID).Methods("GET")
+	router.HandleFunc("/blue-lion/read/enriched-portfolios", EnrichedPortfolios).Methods("GET")
 	router.HandleFunc("/blue-lion/read/portfolios-history", PortfoliosHistoryByPortfolioIDDate).Queries("portfolioId", "", "date", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/portfolios-history", PortfoliosHistoryByDate).Queries("date", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/portfolios-history-max-date", PortfoliosHistoryMaxDate).Methods("GET")
 	router.HandleFunc("/blue-lion/read/positions", PositionsBySymbolPortfolioID).Queries("symbol", "", "portfolioId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/positions", Positions).Methods("GET")
 	router.HandleFunc("/blue-lion/read/positions-history", PositionsHistoryByPortfolioIDDate).Queries("portfolioId", "", "date", "").Methods("GET")
+	router.HandleFunc("/blue-lion/read/enriched-positions", EnrichedPositionsBySymbolPortfolioID).Queries("symbol", "", "portfolioId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-positions", EnrichedPositionsByPortfolioID).Queries("portfolioId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-positions-history", EnrichedPositionsHistoryByPortfolioIDDate).Queries("portfolioId", "", "date", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/portfolio-returns", PortfolioReturnsByDate).Queries("date", "").Methods("GET")
@@ -967,6 +972,12 @@ func Mergers(w http.ResponseWriter, r *http.Request) {
 	RestHandleGet(w, r, "Read-Mergers", &ret, foo, "mergers")
 }
 
+func Projections(w http.ResponseWriter, r *http.Request) {
+	foo := api.JsonProjections{}
+	ret := []api.JsonProjections{}
+	RestHandleGet(w, r, "Read-Projections", &ret, foo, "projections")
+}
+
 func Portfolios(w http.ResponseWriter, r *http.Request) {
 	foo := api.JsonPortfolio{}
 	ret := []api.JsonPortfolio{}
@@ -976,6 +987,77 @@ func Portfolios(w http.ResponseWriter, r *http.Request) {
 func PortfoliosByID(w http.ResponseWriter, r *http.Request) {
 	var ret api.JsonPortfolio
 	RestHandleGetByID(w, r, "Read-PortfoliosByID", &ret, ret, "portfolios")
+}
+
+func EnrichPortfolio(p api.JsonPortfolio) (api.JsonEnrichedPortfolio, error) {
+	ep := api.JsonEnrichedPortfolio{JsonPortfolio: p}
+
+	var totalPortfolio api.JsonPortfolio
+	err := api.PortfoliosByID(cmn.CONST_PORTFOLIO_TOTAL, &totalPortfolio)
+	if err != nil {
+		return ep, err
+	}
+	if totalPortfolio.Value > 0 {
+		ep.PercentTotal = cmn.Round(p.Value/totalPortfolio.Value, 0.0001)
+	}
+	if p.Value > 0 {
+		ep.PercentCash = cmn.Round(p.Cash/p.Value, 0.0001)
+		ep.PercentDebt = cmn.Round(p.Debt/p.Value, 0.0001)
+	}
+
+	return ep, nil
+}
+
+func EnrichedPortfolios(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-EnrichedPortfolios", w, r)
+
+	var portfolios []api.JsonPortfolio
+	err := api.Portfolios(&portfolios)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	ret := []api.JsonEnrichedPortfolio{}
+	for i := range portfolios {
+		ep, err := EnrichPortfolio(portfolios[i])
+		if err != nil {
+			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+			return
+		}
+
+		ret = append(ret, ep)
+	}
+	json.NewEncoder(w).Encode(&ret)
+
+	cmn.Exit("Read-EnrichedPortfolios", ret)
+}
+
+func EnrichedPortfoliosByID(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-EnrichedPortfoliosByID", w, r)
+
+	params := mux.Vars(r)
+	id, err := strconv.Atoi(params["id"])
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	var portfolio api.JsonPortfolio
+	err = api.PortfoliosByID(id, &portfolio)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	ret, err := EnrichPortfolio(portfolio)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(&ret)
+
+	cmn.Exit("Read-EnrichedPortfoliosByID", ret)
 }
 
 func PortfoliosHistoryByDate(w http.ResponseWriter, r *http.Request) {
@@ -1237,6 +1319,7 @@ func PortfolioReturnsByDate(w http.ResponseWriter, r *http.Request) {
 
 func EnrichPosition(p api.JsonPosition) (api.JsonEnrichedPosition, error) {
 	ep := api.JsonEnrichedPosition{JsonPosition: p}
+
 	var refData api.JsonRefData
 	err := api.RefDataByID(ep.RefDataID, &refData)
 	if err != nil {
@@ -1244,6 +1327,16 @@ func EnrichPosition(p api.JsonPosition) (api.JsonEnrichedPosition, error) {
 	}
 	ep.Symbol = refData.Symbol
 	ep.Description = refData.Description
+
+	var portfolio api.JsonPortfolio
+	err = api.PortfoliosByID(p.PortfolioID, &portfolio)
+	if err != nil {
+		return ep, err
+	}
+	if portfolio.Value > 0 {
+		ep.PercentPortfolio = cmn.Round(p.Value/portfolio.Value, 0.0001)
+	}
+
 	return ep, nil
 }
 
@@ -1317,6 +1410,33 @@ func EnrichedPositionsByPortfolioID(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(&ret)
 
 	cmn.Exit("Read-EnrichedPositionsByPortfolioID", ret)
+}
+
+func EnrichedPositionsBySymbolPortfolioID(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-EnrichedPositionsBySymbolPortfolioID", w, r)
+
+	args := new(cmn.RestSymbolPortfolioIDInput)
+	decoder := schema.NewDecoder()
+	err := decoder.Decode(args, r.URL.Query())
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		return
+	}
+
+	var p api.JsonPosition
+	err = api.PositionsBySymbolPortfolioID(args.Symbol, args.PortfolioID, &p)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		return
+	}
+	ret, err := EnrichPosition(p)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		return
+	}
+	json.NewEncoder(w).Encode(&ret)
+
+	cmn.Exit("Read-EnrichedPositionsBySymbolPortfolioID", ret)
 }
 
 func EnrichedPositionsHistoryByPortfolioIDDate(w http.ResponseWriter, r *http.Request) {

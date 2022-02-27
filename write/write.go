@@ -33,6 +33,7 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/write/portfolios/{id}", PortfoliosByID).Methods("PUT")
 	router.HandleFunc("/blue-lion/write/positions/{id}", PositionsByID).Methods("PUT")
 	router.HandleFunc("/blue-lion/write/positions", Positions).Methods("POST")
+	router.HandleFunc("/blue-lion/write/portfolios-history/{id}", PortfoliosHistoryByID).Methods("PUT")
 	router.HandleFunc("/blue-lion/write/portfolios-history", PortfoliosHistory).Methods("POST")
 	router.HandleFunc("/blue-lion/write/positions-history", PositionsHistory).Methods("POST")
 }
@@ -46,7 +47,6 @@ func RestHandlePost(w http.ResponseWriter, r *http.Request, msg string, ptr inte
 		return
 	}
 
-	cmn.LogPost(msg, ptr)
 	db, err := cmn.DbConnect()
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
@@ -74,13 +74,7 @@ func RestHandlePut(w http.ResponseWriter, r *http.Request, msg string, ptr inter
 		return
 	}
 
-	db, err := cmn.DbConnect()
-	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
-		return
-	}
-
-	_, err = db.NamedExec(fmt.Sprintf("%s WHERE id=%s", api.JsonToNamedUpdate(obj, table), id), ptr)
+	err = cmn.DbNamedExec(fmt.Sprintf("%s WHERE id=%s", api.JsonToNamedUpdate(obj, table), id), ptr)
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
@@ -181,6 +175,11 @@ func PortfoliosByID(w http.ResponseWriter, r *http.Request) {
 	RestHandlePut(w, r, "Write-PortfoliosByID", &ret, ret, "portfolios")
 }
 
+func PortfoliosHistoryByID(w http.ResponseWriter, r *http.Request) {
+	var ret api.JsonPortfolioHistory
+	RestHandlePut(w, r, "Write-PortfoliosHistoryByID", &ret, ret, "portfolios_history")
+}
+
 func Positions(w http.ResponseWriter, r *http.Request) {
 	var ret api.JsonPosition
 	RestHandlePost(w, r, "Write-Positions", &ret, ret, "positions")
@@ -243,7 +242,6 @@ func EnrichedMergers(w http.ResponseWriter, r *http.Request) {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
-	cmn.LogPost("Write-EnrichedMergers", input)
 
 	// We've been passed the target and acquirer symbols, so need to look up the id's
 	var targetRefData api.JsonRefData
@@ -290,7 +288,6 @@ func EnrichedMergersJournal(w http.ResponseWriter, r *http.Request) {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
-	cmn.LogPost("Write-EnrichedMergersJournal", input)
 
 	// We've been passed the mergerId and entry, retrieve other info directly from the mergers table
 	var em api.JsonEnrichedMerger
@@ -329,7 +326,6 @@ func EnrichedProjectionsJournal(w http.ResponseWriter, r *http.Request) {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
-	cmn.LogPost("Write-EnrichedProjectionsJournal", input)
 
 	// We've been passed the projectionsId and entry, retrieve other info directly from the projections table
 	var ep api.JsonEnrichedProjections

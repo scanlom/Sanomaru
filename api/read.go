@@ -154,6 +154,13 @@ func ProjectionsBySymbol(symbol string, ret *JsonProjections) error {
 	)
 }
 
+func Projections(slice *[]JsonProjections) error {
+	return RestGetByUrl("Projections",
+		"http://localhost:8081/blue-lion/read/projections",
+		slice,
+	)
+}
+
 func MarketDataBySymbol(symbol string, ret *JsonMarketData) error {
 	return RestGetByUrl("MarketDataBySymbol",
 		fmt.Sprintf("http://localhost:8081/blue-lion/read/market-data?symbol=%s", symbol),
@@ -182,6 +189,20 @@ func Positions(slice *[]JsonPosition) error {
 	)
 }
 
+func PositionsBySymbolPortfolioID(symbol string, portfolioId int, ret *JsonPosition) error {
+	return RestGetByUrl("PositionBySymbolPortfolioID",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/positions?symbol=%s&portfolioId=%d", symbol, portfolioId),
+		ret,
+	)
+}
+
+func EnrichedPositionsBySymbolPortfolioID(symbol string, portfolioId int, ret *JsonEnrichedPosition) error {
+	return RestGetByUrl("EnrichedPositionsBySymbolPortfolioID",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/enriched-positions?symbol=%s&portfolioId=%d", symbol, portfolioId),
+		ret,
+	)
+}
+
 func Portfolios(slice *[]JsonPortfolio) error {
 	return RestGetByUrl("Portfolios",
 		"http://localhost:8081/blue-lion/read/portfolios",
@@ -199,6 +220,13 @@ func EnrichedMergersByID(id int, ret *JsonEnrichedMerger) error {
 func EnrichedProjectionsByID(id int, ret *JsonEnrichedProjections) error {
 	return RestGetByUrl("EnrichedProjectionsByID",
 		fmt.Sprintf("http://localhost:8081/blue-lion/read/enriched-projections/%d", id),
+		ret,
+	)
+}
+
+func PortfoliosByID(id int, ret *JsonPortfolio) error {
+	return RestGetByUrl("PortfoliosByID",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/portfolios/%d", id),
 		ret,
 	)
 }

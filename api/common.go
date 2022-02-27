@@ -7,10 +7,6 @@ import (
 	"strings"
 )
 
-type JsonStringValue struct {
-	Value string `json:"value"`
-}
-
 type JsonFloat64Value struct {
 	Value float64 `json:"value"`
 }
@@ -54,6 +50,7 @@ type JsonProjections struct {
 	EPSYr1     float64 `json:"epsYr1" db:"eps_yr1"`
 	EPSYr2     float64 `json:"epsYr2" db:"eps_yr2"`
 	Confidence string  `json:"confidence" db:"confidence"`
+	Watch      bool    `json:"watch" db:"watch"`
 }
 
 type JsonMDHYearSummary struct {
@@ -181,33 +178,6 @@ type JsonCashflow struct {
 	DPS float64 `json:"dps"`
 }
 
-type JsonHeadline struct {
-	// Ref Data
-	Ticker      string  `json:"ticker"`
-	Description string  `json:"description"`
-	Sector      string  `json:"sector"`
-	Industry    string  `json:"industry"`
-	Price       float64 `json:"price"`
-	// Derived - Financials
-	EPSCagr5yr   float64 `json:"epsCagr5yr"`
-	EPSCagr10yr  float64 `json:"epsCagr10yr"`
-	PEHighMMO5yr int     `json:"peHighMmo5yr"`
-	PELowMMO5yr  int     `json:"peLowMmo5yr"`
-	ROE5yr       float64 `json:"roe5yr"`
-	// Derived - Projections
-	PE            float64 `json:"pe"`
-	EPSCagr2yr    float64 `json:"epsCagr2yr"`
-	EPSCagr7yr    float64 `json:"epsCagr7yr"`
-	DivPlusGrowth float64 `json:"divPlusGrowth"`
-	EPSYield      float64 `json:"epsYield"`
-	DPSYield      float64 `json:"dpsYield"`
-	CAGR5yr       float64 `json:"cagr5yr"`
-	CAGR10yr      float64 `json:"cagr10yr"`
-	CROE5yr       float64 `json:"croe5yr"`
-	CROE10yr      float64 `json:"croe10yr"`
-	Magic         float64 `json:"magic"`
-}
-
 type JsonEnrichedProjections struct {
 	JsonProjections
 	// Ref Data
@@ -216,6 +186,8 @@ type JsonEnrichedProjections struct {
 	Sector      string  `json:"sector" db:"sector"`
 	Industry    string  `json:"industry" db:"industry"`
 	Price       float64 `json:"price" db:"price"`
+	// Position
+	PercentPortfolio float64 `json:"percentPortfolio" db:"percent_portfolio"`
 	// Derived - Financials
 	EPSCagr5yr   float64 `json:"epsCagr5yr" db:"eps_cagr_5yr"`
 	EPSCagr10yr  float64 `json:"epsCagr10yr" db:"eps_cagr_10yr"`
@@ -304,7 +276,15 @@ type JsonPortfolio struct {
 	IndexTotalCapital   float64 `json:"indexTotalCapital" db:"index_total_capital"`
 	DivisorTotalCapital float64 `json:"divisorTotalCapital" db:"divisor_total_capital"`
 	CostBasis           float64 `json:"costBasis" db:"cost_basis"`
+	Model               float64 `json:"model" db:"model"`
 	Active              bool    `json:"active" db:"active"`
+}
+
+type JsonEnrichedPortfolio struct {
+	JsonPortfolio
+	PercentTotal float64 `json:"percentTotal"`
+	PercentCash  float64 `json:"percentCash"`
+	PercentDebt  float64 `json:"percentDebt"`
 }
 
 type JsonPortfolioReturns struct {
@@ -349,8 +329,9 @@ type JsonPositionHistory struct {
 
 type JsonEnrichedPosition struct {
 	JsonPosition
-	Symbol      string `json:"symbol" db:"symbol"`
-	Description string `json:"description" db:"description"`
+	Symbol           string  `json:"symbol" db:"symbol"`
+	Description      string  `json:"description" db:"description"`
+	PercentPortfolio float64 `json:"percentPortfolio"`
 }
 
 type JsonEnrichedPositionHistory struct {
@@ -387,15 +368,26 @@ func JsonToNamedInsert(val interface{}, table string) string {
 	return ret
 }
 
+func JsonToNamedUpdateInternal(t reflect.Type, update *string) {
+	for i := 0; i < t.NumField(); i++ {
+		if t.Field(i).Type.Kind() == reflect.Struct {
+			JsonToNamedUpdateInternal(t.Field(i).Type, update)
+		} else {
+			tag := t.Field(i).Tag.Get("db")
+			if len(tag) > 0 && tag != "id" {
+				*update += tag + "=:" + tag + ","
+			}
+		}
+	}
+}
+
 func JsonToNamedUpdate(val interface{}, table string) string {
 	var update string
 	t := reflect.TypeOf(val)
-	for i := 0; i < t.NumField(); i++ {
-		tag := t.Field(i).Tag.Get("db")
-		if len(tag) > 0 && tag != "id" {
-			update += tag + "=:" + tag + ","
-		}
-	}
+
+	// Sub Structures must be handled recursively
+	JsonToNamedUpdateInternal(t, &update)
+
 	update = strings.TrimRight(update, ",")
 	ret := fmt.Sprintf("UPDATE %s SET %s", table, update)
 	return ret

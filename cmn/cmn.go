@@ -2,6 +2,8 @@ package cmn
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"math"
@@ -11,8 +13,10 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
-	"github.com/scanlom/Sanomaru/api"
 )
+
+const CONST_PORTFOLIO_TOTAL = 1
+const CONST_PORTFOLIO_SELFIE = 2
 
 type RestSymbolInput struct {
 	Symbol string `schema:"symbol"`
@@ -37,7 +41,7 @@ type RestSymbolDateInput struct {
 }
 
 type RestPortfolioIDDateInput struct {
-	PortfolioID int `schema:"portfolioId"`
+	PortfolioID int    `schema:"portfolioId"`
 	Date        string `schema:"date"`
 }
 
@@ -69,15 +73,17 @@ func Exit(name string, ret interface{}) {
 	log.Printf("%s: Complete!", name)
 }
 
-func LogPost(name string, ret interface{}) {
-	log.Printf("%s: Received %v", name, ret)
-}
-
 func ErrorHttp(err error, w http.ResponseWriter, code int) {
 	function, file, line, _ := runtime.Caller(1) // Ignoring the error as we are in an error handler anyway
 	log.Printf("ERROR: File: %s  Function: %s Line: %d", file, runtime.FuncForPC(function).Name(), line)
 	log.Printf("ERROR: %s", err)
 	w.WriteHeader(code)
+}
+
+func ErrorLog(err error) {
+	function, file, line, _ := runtime.Caller(1) // Ignoring the error as we are in an error handler anyway
+	log.Printf("ERROR: File: %s  Function: %s Line: %d", file, runtime.FuncForPC(function).Name(), line)
+	log.Printf("ERROR: %s", err)
 }
 
 func DbConnect() (*sqlx.DB, error) {
@@ -87,7 +93,7 @@ func DbConnect() (*sqlx.DB, error) {
 	}
 
 	log.Println("DbConnect: Acquiring connection")
-	c, err := api.Config("database.connect")
+	c, err := Config("database.connect")
 	if err != nil {
 		return nil, err
 	}
@@ -96,12 +102,22 @@ func DbConnect() (*sqlx.DB, error) {
 }
 
 func DbGet(dest interface{}, query string) error {
-	db, err := DbConnect();
+	db, err := DbConnect()
 	if err != nil {
 		return err
 	}
 	log.Printf("DbGet: %s", query)
 	err = db.Get(dest, query)
+	return err
+}
+
+func DbNamedExec(query string, ptr interface{}) error {
+	db, err := DbConnect()
+	if err != nil {
+		return err
+	}
+	log.Printf("DbNamedExec: %s", query)
+	_, err = db.NamedExec(query, ptr)
 	return err
 }
 
@@ -126,4 +142,30 @@ func CorsMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+type JsonStringValue struct {
+	Value string `json:"value"`
+}
+
+func Config(name string) (string, error) {
+	log.Println("Api.Config: Called...")
+	response, err := http.Get(fmt.Sprintf("http://localhost:8082/blue-lion/config?name=%s", name))
+	if err != nil {
+		return "", err
+	}
+
+	data, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return "", err
+	}
+
+	var val JsonStringValue
+	err = json.Unmarshal(data, &val)
+	if err != nil {
+		return "", err
+	}
+
+	log.Println("Api.Config: Success!")
+	return val.Value, nil
 }
