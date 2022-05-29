@@ -54,7 +54,7 @@ func CacheEnrichedProjections(positionsProjections *[]api.JsonEnrichedProjection
 		if api.ConfidenceToInt((*watchProjections)[i].Confidence) == api.ConfidenceToInt((*watchProjections)[j].Confidence) {
 			return (*watchProjections)[i].CAGR5yr > (*watchProjections)[j].CAGR5yr
 		}
-		return api.ConfidenceToInt((*researchProjections)[i].Confidence) > api.ConfidenceToInt((*researchProjections)[j].Confidence)
+		return api.ConfidenceToInt((*watchProjections)[i].Confidence) > api.ConfidenceToInt((*watchProjections)[j].Confidence)
 	})
 
 	sort.Slice(*researchProjections, func(i, j int) bool {
@@ -100,5 +100,5 @@ func main() {
 	router.HandleFunc("/blue-lion/cache/enriched-projections-positions-total", EnrichedProjections("Cache-EnrichedProjectionsPositionsTotal", positionsProjectionsTotal, err)).Methods("GET")
 	router.HandleFunc("/blue-lion/cache/enriched-projections-watch", EnrichedProjections("Cache-EnrichedProjectionsWatch", watchProjections, err)).Methods("GET")
 	router.HandleFunc("/blue-lion/cache/enriched-projections-research", EnrichedProjections("Cache-EnrichedProjectionsResearch", researchProjections, err)).Methods("GET")
-	log.Fatal(http.ListenAndServe(":8084", cmn.CorsMiddleware(router)))
+	log.Fatal(http.ListenAndServe(":8084", router))
 }

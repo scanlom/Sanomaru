@@ -20,7 +20,9 @@ import (
 func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/market-data/{id}", MarketDataByID).Methods("GET")
 	router.HandleFunc("/blue-lion/read/market-data", MarketDataBySymbol).Queries("symbol", "").Methods("GET")
+	router.HandleFunc("/blue-lion/read/market-data", MarketDataByRefDataID).Queries("refDataId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/market-data", MarketData).Methods("GET")
+	router.HandleFunc("/blue-lion/read/enriched-market-data", EnrichedMarketDataBySymbol).Queries("symbol", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/market-data-historical/year-summary", MDHYearSummaryBySymbol).Queries("symbol", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/market-data-historical", MDHByRefDataIDDate).Queries("refDataId", "", "date", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/ref-data/focus", RefDataFocus).Methods("GET")
@@ -41,7 +43,9 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/cashflow", CashflowByTicker).Queries("ticker", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/summary", SummaryByTicker).Queries("ticker", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/mergers", Mergers).Methods("GET")
-	router.HandleFunc("/blue-lion/read/enriched-mergers", EnrichedMergers).Methods("GET")
+	router.HandleFunc("/blue-lion/read/enriched-mergers-positions", EnrichedMergersPositions).Methods("GET")
+	router.HandleFunc("/blue-lion/read/enriched-mergers-positions-total", EnrichedMergersPositionsTotal).Methods("GET")
+	router.HandleFunc("/blue-lion/read/enriched-mergers-research", EnrichedMergersResearch).Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-mergers/{id}", EnrichedMergersByID).Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-mergers-journal", EnrichedMergersJournalByMergerID).Queries("mergerId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-projections/{id}", EnrichedProjectionsByID).Methods("GET")
@@ -54,14 +58,18 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/portfolios-history", PortfoliosHistoryByPortfolioIDDate).Queries("portfolioId", "", "date", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/portfolios-history", PortfoliosHistoryByDate).Queries("date", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/portfolios-history-max-date", PortfoliosHistoryMaxDate).Methods("GET")
+	router.HandleFunc("/blue-lion/read/positions/{id}", PositionsByID).Methods("GET")
 	router.HandleFunc("/blue-lion/read/positions", PositionsBySymbolPortfolioID).Queries("symbol", "", "portfolioId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/positions", Positions).Methods("GET")
 	router.HandleFunc("/blue-lion/read/positions-history", PositionsHistoryByPortfolioIDDate).Queries("portfolioId", "", "date", "").Methods("GET")
+	router.HandleFunc("/blue-lion/read/enriched-positions/{id}", EnrichedPositionsByID).Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-positions", EnrichedPositionsBySymbolPortfolioID).Queries("symbol", "", "portfolioId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-positions", EnrichedPositionsByPortfolioID).Queries("portfolioId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-positions-history", EnrichedPositionsHistoryByPortfolioIDDate).Queries("portfolioId", "", "date", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/portfolio-returns", PortfolioReturnsByDate).Queries("date", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/portfolio-returns", PortfolioReturns).Methods("GET")
+	router.HandleFunc("/blue-lion/read/transactions", TransactionsByPositionID).Methods("GET").Queries("positionId", "").Methods("GET")
+	router.HandleFunc("/blue-lion/read/transactions", Transactions).Methods("GET")
 	router.Methods("GET").Path("/blue-lion/read/scalar").HandlerFunc(Scalar)
 }
 
@@ -245,6 +253,11 @@ func EnrichedProjectionsJournalByProjectionsID(w http.ResponseWriter, r *http.Re
 	cmn.Exit("Read-EnrichedProjectionsJournalByProjectionsID", ret)
 }
 
+func PositionsByID(w http.ResponseWriter, r *http.Request) {
+	var ret api.JsonPosition
+	RestHandleGetByID(w, r, "Read-PositionsByID", &ret, ret, "positions")
+}
+
 func ProjectionsByID(w http.ResponseWriter, r *http.Request) {
 	var ret api.JsonProjections
 	RestHandleGetByID(w, r, "Read-ProjectionsBySymbol", &ret, ret, "projections")
@@ -343,6 +356,57 @@ func MarketDataByID(w http.ResponseWriter, r *http.Request) {
 func MarketDataBySymbol(w http.ResponseWriter, r *http.Request) {
 	var ret api.JsonMarketData
 	RestHandleGetBySymbol(w, r, "Read-MarketDataBySymbol", &ret, ret, "market_data")
+}
+
+func MarketDataByRefDataID(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-MarketDataByRefDataID", w, r)
+
+	args := new(cmn.RestRefDataIDInput)
+	decoder := schema.NewDecoder()
+	err := decoder.Decode(args, r.URL.Query())
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		return
+	}
+
+	ret := api.JsonMarketData{}
+	err = cmn.DbGet(&ret, api.JsonToSelect(api.JsonMarketData{}, fmt.Sprintf("market_data WHERE ref_data_id=%d", args.RefDataID), ""))
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(&ret)
+
+	cmn.Exit("Read-MarketDataByRefDataID", ret)
+}
+
+func EnrichedMarketDataBySymbol(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-EnrichedMarketDataBySymbol", w, r)
+
+	args := new(cmn.RestSymbolInput)
+	decoder := schema.NewDecoder()
+	err := decoder.Decode(args, r.URL.Query())
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		return
+	}
+
+	refDataID, err := api.SymbolToRefDataID(args.Symbol)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	var ret api.JsonEnrichedMarketData
+	err = cmn.DbGet(&ret, fmt.Sprintf("select id, ref_data_id, last, (updated_at < current_date - interval '4 days') as stale from market_data WHERE ref_data_id=%d", refDataID))
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(&ret)
+
+	cmn.Exit("Read-EnrichedMarketDataBySymbol", &ret)
 }
 
 func MDHYearSummaryBySymbol(w http.ResponseWriter, r *http.Request) {
@@ -984,6 +1048,34 @@ func Portfolios(w http.ResponseWriter, r *http.Request) {
 	RestHandleGet(w, r, "Read-Portfolios", &ret, foo, "portfolios WHERE active=true ORDER BY id ASC")
 }
 
+func Transactions(w http.ResponseWriter, r *http.Request) {
+	foo := api.JsonTransaction{}
+	ret := []api.JsonTransaction{}
+	RestHandleGet(w, r, "Read-Transactions", &ret, foo, "transactions")
+}
+
+func TransactionsByPositionID(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-TransactionsByPositionID", w, r)
+
+	args := new(cmn.RestPositionIDInput)
+	decoder := schema.NewDecoder()
+	err := decoder.Decode(args, r.URL.Query())
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		return
+	}
+
+	ret := []api.JsonTransaction{}
+	err = cmn.DbSelect(&ret, api.JsonToSelect(api.JsonTransaction{}, fmt.Sprintf("transactions WHERE position_id=%d ORDER BY date desc", args.PositionID), ""))
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(&ret)
+
+	cmn.Exit("Read-TransactionsByPositionID", ret)
+}
+
 func PortfoliosByID(w http.ResponseWriter, r *http.Request) {
 	var ret api.JsonPortfolio
 	RestHandleGetByID(w, r, "Read-PortfoliosByID", &ret, ret, "portfolios")
@@ -1333,7 +1425,7 @@ func EnrichPosition(p api.JsonPosition) (api.JsonEnrichedPosition, error) {
 	if err != nil {
 		return ep, err
 	}
-	if portfolio.Value > 0 {
+	if ep.Active && portfolio.Value > 0 {
 		ep.PercentPortfolio = cmn.Round(p.Value/portfolio.Value, 0.0001)
 	}
 
@@ -1387,7 +1479,7 @@ func EnrichedPositionsByPortfolioID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	positions := []api.JsonPosition{}
-	err = db.Select(&positions, api.JsonToSelect(api.JsonPosition{}, "positions", "")+fmt.Sprintf(" WHERE portfolio_id=%d ORDER BY id DESC", args.PortfolioID))
+	err = db.Select(&positions, api.JsonToSelect(api.JsonPosition{}, "positions", "")+fmt.Sprintf(" WHERE portfolio_id=%d AND active=True ORDER BY id DESC", args.PortfolioID))
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
@@ -1466,6 +1558,7 @@ func EnrichedPositionsHistoryByPortfolioIDDate(w http.ResponseWriter, r *http.Re
 		eph := api.JsonEnrichedPositionHistory{JsonEnrichedPosition: ep}
 		eph.Date = positions[i].Date
 		eph.PortfolioID = positions[i].PortfolioID
+		eph.PositionID = positions[i].PositionID
 		ret = append(ret, eph)
 	}
 
@@ -1499,24 +1592,44 @@ func EnrichMerger(m api.JsonMerger) (api.JsonEnrichedMerger, error) {
 	if err != nil {
 		return em, err
 	}
+	em.Price = md.Last
 
 	fees := 0.005
 	if strings.Contains(em.TargetTicker, ".HK") {
-		fees = (0.0008 + 0.0013) * md.Last // 8 bps commison and 13 bps stamp on each side
+		fees = (0.0008 + 0.0013) * md.Last // 8 bps commision and 13 bps stamp on each side
 	}
 
 	em.MarketPositiveReturn = cmn.Round((em.DealPrice+em.Dividends-fees)/md.Last-1, 0.0001)
 	em.MarketNetReturn = cmn.Round(
 		((em.DealPrice+em.Dividends-fees-md.Last)*em.Confidence-(md.Last-em.FailPrice-em.Dividends+2*fees)*(1-em.Confidence))/md.Last, 0.0001)
 	closeTime := cmn.DateStringToTime(em.CloseDate)
-	annualizeMultiple := 365 / (closeTime.Sub(time.Now()).Hours() / 24)
+	daysToClose := closeTime.Sub(time.Now()).Hours() / 24
+	annualizeMultiple := 365 / daysToClose
 	em.MarketPositiveReturnAnnualized = cmn.Round(annualizeMultiple*em.MarketPositiveReturn, 0.0001)
 	em.MarketNetReturnAnnualized = cmn.Round(annualizeMultiple*em.MarketNetReturn, 0.0001)
+
+	var position api.JsonEnrichedPosition
+	err = api.EnrichedPositionsBySymbolPortfolioID(em.TargetTicker, cmn.CONST_PORTFOLIO_RISK_ARB, &position)
+	// Don't pass the error up, it's ok if this isn't a position, we just populate zero
+	if err == nil {
+		em.PercentPortfolio = position.PercentPortfolio
+	}
+
+	if em.PercentPortfolio > 0 {
+		em.Status = "P"
+	} else if em.BreakPrice > 0 {
+		em.Status = "B"
+	} else if daysToClose < 0 {
+		em.Status = "C"
+	} else {
+		em.Status = "O"
+	}
+
 	return em, nil
 }
 
-func EnrichedMergers(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-EnrichedMergers", w, r)
+func EnrichedMergersPositions(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-EnrichedMergersPositions", w, r)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	var mergers []api.JsonMerger
@@ -1534,17 +1647,78 @@ func EnrichedMergers(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		ret = append(ret, em)
+		if em.PercentPortfolio > 0 {
+			ret = append(ret, em)
+		}
 	}
 	sort.Slice(ret, func(i, j int) bool {
-		if ret[i].MarketNetReturnAnnualized == ret[j].MarketNetReturnAnnualized {
-			return ret[i].MarketPositiveReturnAnnualized > ret[j].MarketPositiveReturnAnnualized
-		}
-		return ret[i].MarketNetReturnAnnualized > ret[j].MarketNetReturnAnnualized
+		return ret[i].PercentPortfolio > ret[j].PercentPortfolio
 	})
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-EnrichedMergers", ret)
+	cmn.Exit("Read-EnrichedMergersPositions", ret)
+}
+
+func EnrichedMergersPositionsTotal(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-EnrichedMergersPositionsTotal", w, r)
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	var mergers []api.JsonEnrichedMerger
+	err := api.EnrichedMergersPositions(&mergers)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	total := api.JsonEnrichedMerger{}
+	total.TargetTicker = "Total"
+	ret := []api.JsonEnrichedMerger{}
+	for i := range mergers {
+		total.PercentPortfolio += mergers[i].PercentPortfolio
+		total.MarketNetReturn += mergers[i].MarketNetReturn * mergers[i].PercentPortfolio
+		total.MarketNetReturnAnnualized += mergers[i].MarketNetReturnAnnualized * mergers[i].PercentPortfolio
+		total.MarketPositiveReturn += mergers[i].MarketPositiveReturn * mergers[i].PercentPortfolio
+		total.MarketPositiveReturnAnnualized += mergers[i].MarketPositiveReturnAnnualized * mergers[i].PercentPortfolio
+	}
+	ret = append(ret, total)
+	json.NewEncoder(w).Encode(&ret)
+
+	cmn.Exit("Read-EnrichedMergersPositionsTotal", ret)
+}
+
+func EnrichedMergersResearch(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-EnrichedMergersResearch", w, r)
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	var mergers []api.JsonMerger
+	err := api.Mergers(&mergers)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	ret := []api.JsonEnrichedMerger{}
+	for i := range mergers {
+		em, err := EnrichMerger(mergers[i])
+		if err != nil {
+			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+			return
+		}
+
+		if em.PercentPortfolio <= 0 {
+			ret = append(ret, em)
+		}
+	}
+
+	sort.Slice(ret, func(i, j int) bool {
+		if api.MergerStatusToInt(ret[i].Status) == api.MergerStatusToInt(ret[j].Status) {
+			return ret[i].MarketNetReturnAnnualized > ret[j].MarketNetReturnAnnualized
+		}
+		return api.MergerStatusToInt(ret[i].Status) > api.MergerStatusToInt(ret[j].Status)
+	})
+	json.NewEncoder(w).Encode(&ret)
+
+	cmn.Exit("Read-EnrichedMergersResearch", ret)
 }
 
 func EnrichedMergersByID(w http.ResponseWriter, r *http.Request) {
@@ -1575,6 +1749,33 @@ func EnrichedMergersByID(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(&em)
 
 	cmn.Exit("Read-EnrichedMergersByID", em)
+}
+
+func EnrichedPositionsByID(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-EnrichedPositionsByID", w, r)
+
+	params := mux.Vars(r)
+	id, err := strconv.Atoi(params["id"])
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	p := api.JsonPosition{}
+	err = api.PositionsByID(id, &p)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+	ep, err := EnrichPosition(p)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(&ep)
+
+	cmn.Exit("Read-EnrichedPositionsByID", ep)
 }
 
 type EnrichedMergersJournalByMergerIDInput struct {
@@ -1614,5 +1815,5 @@ func main() {
 	log.Println("Listening on http://localhost:8081/blue-lion/read")
 	router := mux.NewRouter().StrictSlash(true)
 	setupRouter(router)
-	log.Fatal(http.ListenAndServe(":8081", cmn.CorsMiddleware(router)))
+	log.Fatal(http.ListenAndServe(":8081", router))
 }

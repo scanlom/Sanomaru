@@ -15,8 +15,36 @@ import (
 	_ "github.com/lib/pq"
 )
 
+const CONST_PRICING_TYPE_BY_PRICE = 1
+const CONST_PRICING_TYPE_BY_VALUE = 2
+
 const CONST_PORTFOLIO_TOTAL = 1
 const CONST_PORTFOLIO_SELFIE = 2
+const CONST_PORTFOLIO_OAK = 3
+const CONST_PORTFOLIO_MANAGED = 4
+const CONST_PORTFOLIO_RISK_ARB = 5
+const CONST_PORTFOLIO_TRADE_FIN = 6
+const CONST_PORTFOLIO_QUICK = 7
+const CONST_PORTFOLIO_PORTFOLIO = 8
+const CONST_PORTFOLIO_NONE = 99
+
+const CONST_FX_GBP = 76.34
+const CONST_FX_HKD = 7.79
+const CONST_FX_ILS = 342
+const CONST_FX_INR = 73.52
+const CONST_FX_JPY = 104.01
+const CONST_FX_SGD = 1.35
+
+var CONST_FX_MAP = map[string]float64{
+	"1373.HK":    CONST_FX_HKD,
+	"2788.HK":    CONST_FX_HKD,
+	"6670.T":     CONST_FX_JPY,
+	"ASALCBR.NS": CONST_FX_INR,
+	"MRO.L":      CONST_FX_GBP,
+	"BATS.L":     CONST_FX_GBP,
+	"TEVA.TA":    CONST_FX_ILS,
+	"U11.SI":     CONST_FX_SGD,
+}
 
 type RestSymbolInput struct {
 	Symbol string `schema:"symbol"`
@@ -27,6 +55,13 @@ type RestSymbolPortfolioIDInput struct {
 	PortfolioID int    `schema:"portfolioId"`
 }
 
+type RestPositionIDInput struct {
+	PositionID int `schema:"positionId"`
+}
+
+type RestRefDataIDInput struct {
+	RefDataID int `schema:"refDataId"`
+}
 type RestTickerInput struct {
 	Ticker string `schema:"ticker"`
 }
@@ -58,13 +93,14 @@ var db *sqlx.DB
 
 func Enter(name string, w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s: Called...", name)
-	log.Printf("%s: Query Arguments: %v", name, r.URL.Query())
+	log.Printf("%s: URI: %s", name, r.URL.RequestURI())
 	var bodyBytes []byte
 	bodyBytes, _ = ioutil.ReadAll(r.Body)
 	r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 	bodyString := string(bodyBytes)
 	log.Printf("%s: Body Arguments: %s", name, bodyString)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS")
 	w.Header().Set("Content-Type", "application/json")
 }
 
@@ -111,6 +147,16 @@ func DbGet(dest interface{}, query string) error {
 	return err
 }
 
+func DbSelect(dest interface{}, query string) error {
+	db, err := DbConnect()
+	if err != nil {
+		return err
+	}
+	log.Printf("DbSelect: %s", query)
+	err = db.Select(dest, query)
+	return err
+}
+
 func DbNamedExec(query string, ptr interface{}) error {
 	db, err := DbConnect()
 	if err != nil {
@@ -132,11 +178,16 @@ func DateStringToTime(date string) time.Time {
 
 func CorsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("CorsMiddleware: Http Method: %s", r.Method)
+
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "*")
+		w.Header().Set("Access-Control-Allow-Headers", "*")
+		w.Header().Set("Content-Type", "application/json")
+
 		if r.Method == "OPTIONS" {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-			w.Header().Set("Content-Type", "application/json")
+			log.Println("CorsMiddleware: Short Circuit, returning OK")
+			w.WriteHeader(http.StatusOK)
 			return
 		}
 

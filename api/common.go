@@ -5,6 +5,8 @@ import (
 	"log"
 	"reflect"
 	"strings"
+
+	"github.com/jmoiron/sqlx/types"
 )
 
 type JsonFloat64Value struct {
@@ -26,6 +28,11 @@ type JsonMarketData struct {
 	ID        int     `json:"id" db:"id"`
 	RefDataID int     `json:"refDataId" db:"ref_data_id"`
 	Last      float64 `json:"last" db:"last"`
+}
+
+type JsonEnrichedMarketData struct {
+	JsonMarketData
+	Stale bool `json:"stale" db:"stale"`
 }
 
 type JsonMarketDataHistorical struct {
@@ -233,6 +240,7 @@ type JsonSummary struct {
 
 type JsonMerger struct {
 	ID                int     `json:"id" db:"id"`
+	Date              string  `json:"date" db:"date"`
 	AcquirerRefDataID int     `json:"acquirerRefDataId" db:"acquirer_ref_data_id"`
 	TargetRefDataID   int     `json:"targetRefDataId" db:"target_ref_data_id"`
 	DealPrice         float64 `json:"dealPrice" db:"deal_price"`
@@ -252,10 +260,13 @@ type JsonEnrichedMerger struct {
 	AcquirerDescription            string  `json:"acquirerDescription" db:"acquirer_description"`
 	TargetTicker                   string  `json:"targetTicker" db:"target_ticker"`
 	TargetDescription              string  `json:"targetDescription" db:"target_description"`
+	Price                          float64 `json:"price" db:"price"`
 	MarketPositiveReturn           float64 `json:"marketPositiveReturn" db:"market_positive_return"`
 	MarketNetReturn                float64 `json:"marketNetReturn" db:"market_net_return"`
 	MarketPositiveReturnAnnualized float64 `json:"marketPositiveReturnAnnualized" db:"market_positive_return_annualized"`
 	MarketNetReturnAnnualized      float64 `json:"marketNetReturnAnnualized" db:"market_net_return_annualized"`
+	PercentPortfolio               float64 `json:"percentPortfolio" db:"percent_portfolio"`
+	Status                         string  `json:"status" db:"status"`
 }
 
 type JsonEnrichedMergerJournal struct {
@@ -307,18 +318,20 @@ type JsonPortfolioHistory struct {
 }
 
 type JsonPosition struct {
-	ID          int     `json:"id" db:"id"`
-	RefDataID   int     `json:"refDataId" db:"ref_data_id"`
-	PortfolioID int     `json:"portfolioId" db:"portfolio_id"`
-	Quantity    float64 `json:"quantity" db:"quantity"`
-	Price       float64 `json:"price" db:"price"`
-	Value       float64 `json:"value" db:"value"`
-	Index       float64 `json:"index" db:"index"`
-	Divisor     float64 `json:"divisor" db:"divisor"`
-	CostBasis   float64 `json:"costBasis" db:"cost_basis"`
-	Model       float64 `json:"model" db:"model"`
-	PricingType int     `json:"pricingType" db:"pricing_type"`
-	Active      bool    `json:"active" db:"active"`
+	ID                   int     `json:"id" db:"id"`
+	RefDataID            int     `json:"refDataId" db:"ref_data_id"`
+	PortfolioID          int     `json:"portfolioId" db:"portfolio_id"`
+	Quantity             float64 `json:"quantity" db:"quantity"`
+	Price                float64 `json:"price" db:"price"`
+	Value                float64 `json:"value" db:"value"`
+	Index                float64 `json:"index" db:"index"`
+	Divisor              float64 `json:"divisor" db:"divisor"`
+	CostBasis            float64 `json:"costBasis" db:"cost_basis"`
+	TotalCashInfusion    float64 `json:"totalCashInfusion" db:"total_cash_infusion"`
+	AccumulatedDividends float64 `json:"accumulatedDividends" db:"accumulated_dividends"`
+	Model                float64 `json:"model" db:"model"`
+	PricingType          int     `json:"pricingType" db:"pricing_type"`
+	Active               bool    `json:"active" db:"active"`
 }
 
 type JsonPositionHistory struct {
@@ -338,6 +351,21 @@ type JsonEnrichedPositionHistory struct {
 	JsonEnrichedPosition
 	Date       string `json:"date" db:"date"`
 	PositionID int    `json:"positionId" db:"position_id"`
+}
+
+type JsonTransaction struct {
+	ID              int            `json:"id" db:"id"`
+	Date            string         `json:"date" db:"date"`
+	Type            int            `json:"type" db:"type"`
+	SubType         int            `json:"subType" db:"sub_type"`
+	PositionID      int            `json:"positionId" db:"position_id"`
+	PortfolioID     int            `json:"portfolioId" db:"portfolio_id"`
+	Value           float64        `json:"value" db:"value"`
+	Quantity        float64        `json:"quantity" db:"quantity"`
+	PositionBefore  types.JSONText `json:"positionBefore" db:"position_before"`
+	PositionAfter   types.JSONText `json:"positionAfter" db:"position_after"`
+	PortfolioBefore types.JSONText `json:"portfolioBefore" db:"portfolio_before"`
+	PortfolioAfter  types.JSONText `json:"portfolioAfter" db:"portfolio_after"`
 }
 
 func JsonToNamedInsertInternal(t reflect.Type, cols *string, params *string) {

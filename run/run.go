@@ -1,54 +1,51 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"log"
-	"net/http"
-
-	"github.com/gorilla/mux"
-	"github.com/scanlom/Sanomaru/api"
-	"github.com/scanlom/Sanomaru/cmn"
 )
-
+/*
 func setupRouter(router *mux.Router) {
-	router.HandleFunc("/blue-lion/write/market-data/{id}", MarketDataByID).Methods("PUT")
-	router.HandleFunc("/blue-lion/write/market-data", MarketData).Methods("POST")
-	router.HandleFunc("/blue-lion/write/market-data-historical", MarketDataHistorical).Methods("POST")
-	router.HandleFunc("/blue-lion/write/market-data-historical/{id}", MarketDataHistoricalByID).Methods("PUT")
-	router.HandleFunc("/blue-lion/write/ref-data/{id}", RefDataByID).Methods("PUT")
-	router.HandleFunc("/blue-lion/write/ref-data", RefData).Methods("POST")
-	router.HandleFunc("/blue-lion/write/projections/{id}", ProjectionsByID).Methods("PUT")
-	router.HandleFunc("/blue-lion/write/projections", Projections).Methods("POST")
-	router.HandleFunc("/blue-lion/write/simfin-income", SimfinIncome).Methods("POST")
-	router.HandleFunc("/blue-lion/write/simfin-income/{id}", SimfinIncomeByIDDelete).Methods("DELETE")
-	router.HandleFunc("/blue-lion/write/simfin-balance", SimfinBalance).Methods("POST")
-	router.HandleFunc("/blue-lion/write/simfin-balance/{id}", SimfinBalanceByIDDelete).Methods("DELETE")
-	router.HandleFunc("/blue-lion/write/simfin-cashflow", SimfinCashflow).Methods("POST")
-	router.HandleFunc("/blue-lion/write/simfin-cashflow/{id}", SimfinCashflowByIDDelete).Methods("DELETE")
-	router.HandleFunc("/blue-lion/write/mergers/{id}", MergersByID).Methods("PUT")
-	router.HandleFunc("/blue-lion/write/enriched-mergers", EnrichedMergers).Methods("POST")
-	router.HandleFunc("/blue-lion/write/enriched-mergers-journal/{id}", EnrichedMergersJournalByIDDelete).Methods("DELETE")
-	router.HandleFunc("/blue-lion/write/enriched-mergers-journal/{id}", EnrichedMergersJournalByID).Methods("PUT")
-	router.HandleFunc("/blue-lion/write/enriched-mergers-journal", EnrichedMergersJournal).Methods("POST")
-	router.HandleFunc("/blue-lion/write/enriched-projections-journal/{id}", EnrichedProjectionsJournalByIDDelete).Methods("DELETE")
-	router.HandleFunc("/blue-lion/write/enriched-projections-journal/{id}", EnrichedProjectionsJournalByID).Methods("PUT")
-	router.HandleFunc("/blue-lion/write/enriched-projections-journal", EnrichedProjectionsJournal).Methods("POST")
-	router.HandleFunc("/blue-lion/write/portfolios/{id}", PortfoliosByID).Methods("PUT")
-	router.HandleFunc("/blue-lion/write/positions/{id}", PositionsByID).Methods("PUT")
-	router.HandleFunc("/blue-lion/write/positions", Positions).Methods("POST")
-	router.HandleFunc("/blue-lion/write/portfolios-history/{id}", PortfoliosHistoryByID).Methods("PUT")
-	router.HandleFunc("/blue-lion/write/portfolios-history", PortfoliosHistory).Methods("POST")
-	router.HandleFunc("/blue-lion/write/positions-history", PositionsHistory).Methods("POST")
-	router.HandleFunc("/blue-lion/write/positions-history/{id}", PositionsHistoryByID).Methods("PUT")
-	router.HandleFunc("/blue-lion/write/transactions", Transactions).Methods("POST")
-	router.HandleFunc("/blue-lion/write/transactions/{id}", TransactionsByID).Methods("PUT")
+	router.HandleFunc("/blue-lion/run/job-valuation-cut", JobValuationCut).Methods("GET")
 }
 
-func RestHandleOptions(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("RestHandleOptions", w, r)
-	w.WriteHeader(http.StatusOK)
-	cmn.Exit("RestHandleOptions", nil)
+func JobValuationCut(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Run-JobValuationCut", w, r)
+
+	// Update price, value, index for all by price positions
+	var positions []api.JsonPosition
+	err := api.Positions(&positions)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	for i := range positions {
+		if cmn.CONST_PRICING_TYPE_BY_PRICE == positions[i].PricingType {
+			var md api.JsonMarketData
+			err = api.MarketDataByRefDataID(positions[i].RefDataID, &md)
+			if err != nil {
+				cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+				return
+			}
+
+			/*if row.symbol in CONST_FX_MAP:
+            fx = CONST_FX_MAP[ row.symbol ]
+            log.info( "Using fx %f" % ( fx ) )
+
+			positions[i].Price = md.Last
+			positions[i].Value = 
+		}
+		ep, err := EnrichPosition(positions[i])
+		if err != nil {
+			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+			return
+		}
+
+		ret = append(ret, ep)
+	}
+	json.NewEncoder(w).Encode(&ret)
+
+	cmn.Exit("Run-JobValuationCut", ret)
 }
 
 func RestHandlePost(w http.ResponseWriter, r *http.Request, msg string, ptr interface{}, obj interface{}, table string) {
@@ -93,13 +90,6 @@ func RestHandlePut(w http.ResponseWriter, r *http.Request, msg string, ptr inter
 
 func RestHandleDelete(w http.ResponseWriter, r *http.Request, msg string, table string) {
 	cmn.Enter(msg, w, r)
-
-	if r.Method == http.MethodOptions {
-		// If this is a preflight check, simply return OK
-		w.WriteHeader(http.StatusOK)
-		cmn.Exit(msg, http.StatusOK)
-		return
-	}
 
 	params := mux.Vars(r)
 	id := params["id"]
@@ -308,37 +298,6 @@ func EnrichedMergers(w http.ResponseWriter, r *http.Request) {
 	cmn.Exit("Write-EnrichedMergers", &ret)
 }
 
-func EnrichedMergersJournalByIDDelete(w http.ResponseWriter, r *http.Request) {
-	RestHandleDelete(w, r, "Write-EnrichedMergersJournalByIDDelete", "mergers_journal")
-}
-
-func EnrichedMergersJournalByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Write-EnrichedMergersJournalByID", w, r)
-	var input api.JsonEnrichedMergerJournal
-	params := mux.Vars(r)
-	id := params["id"]
-	err := json.NewDecoder(r.Body).Decode(&input)
-	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
-		return
-	}
-
-	db, err := cmn.DbConnect()
-	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
-		return
-	}
-
-	// Only the entry can be updated
-	_, err = db.Exec("UPDATE mergers_journal SET entry=$1 WHERE id=$2", input.Entry, id)
-	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
-		return
-	}
-	json.NewEncoder(w).Encode(input)
-	cmn.Exit("Write-EnrichedMergersJournalByID", input)
-}
-
 func EnrichedMergersJournal(w http.ResponseWriter, r *http.Request) {
 	var input api.JsonEnrichedMergerJournal
 	cmn.Enter("Write-EnrichedMergersJournal", w, r)
@@ -362,14 +321,20 @@ func EnrichedMergersJournal(w http.ResponseWriter, r *http.Request) {
 	ret.Date = input.Date
 	ret.Entry = input.Entry
 
-	// First, tweak the date on the merger (on every journal entry the user is reaffirming the merger)
-	err = cmn.DbNamedExec(fmt.Sprintf("%s WHERE id=%d", api.JsonToNamedUpdate(ret.JsonMerger, "mergers"), ret.MergerID), &ret.JsonMerger)
+	db, err := cmn.DbConnect()
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
-	err = cmn.DbNamedExec(api.JsonToNamedInsert(ret, "mergers_journal"), &ret)
+	// First, tweak the date on the merger (on every journal entry the user is reaffirming the merger)
+	_, err = db.NamedExec(fmt.Sprintf("%s WHERE id=%d", api.JsonToNamedUpdate(ret.JsonMerger, "mergers"), ret.ID), &ret.JsonMerger)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	_, err = db.NamedExec(api.JsonToNamedInsert(ret, "mergers_journal"), &ret)
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
@@ -377,37 +342,6 @@ func EnrichedMergersJournal(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(&ret)
 	cmn.Exit("Write-EnrichedMergersJournal", &ret)
-}
-
-func EnrichedProjectionsJournalByIDDelete(w http.ResponseWriter, r *http.Request) {
-	RestHandleDelete(w, r, "Write-EnrichedProjectionsJournalByIDDelete", "projections_journal")
-}
-
-func EnrichedProjectionsJournalByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Write-EnrichedProjectionsJournalByID", w, r)
-	var input api.JsonEnrichedProjectionsJournal
-	params := mux.Vars(r)
-	id := params["id"]
-	err := json.NewDecoder(r.Body).Decode(&input)
-	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
-		return
-	}
-
-	db, err := cmn.DbConnect()
-	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
-		return
-	}
-
-	// Only the entry can be updated
-	_, err = db.Exec("UPDATE projections_journal SET entry=$1 WHERE id=$2", input.Entry, id)
-	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
-		return
-	}
-	json.NewEncoder(w).Encode(input)
-	cmn.Exit("Write-EnrichedProjectionsJournalByID", input)
 }
 
 func EnrichedProjectionsJournal(w http.ResponseWriter, r *http.Request) {
@@ -456,10 +390,10 @@ func EnrichedProjectionsJournal(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(&ret)
 	cmn.Exit("Write-EnrichedProjectionsJournal", &ret)
 }
-
+*/
 func main() {
-	log.Println("Listening on http://localhost:8083/blue-lion/write")
-	router := mux.NewRouter().StrictSlash(true)
-	setupRouter(router)
-	log.Fatal(http.ListenAndServe(":8083", cmn.CorsMiddleware(router)))
+	log.Println("Listening on http://localhost:8083/blue-lion/run")
+	//router := mux.NewRouter().StrictSlash(true)
+	//setupRouter(router)
+	//log.Fatal(http.ListenAndServe(":8085", cmn.CorsMiddleware(router)))
 }

@@ -168,6 +168,13 @@ func MarketDataBySymbol(symbol string, ret *JsonMarketData) error {
 	)
 }
 
+func MarketDataByRefDataID(refDataID int, ret *JsonMarketData) error {
+	return RestGetByUrl("MarketDataByRefDataID",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/market-data?refDataId=%d", refDataID),
+		ret,
+	)
+}
+
 func RefDataByID(id int, ret *JsonRefData) error {
 	return RestGetByUrl("RefDataByID",
 		fmt.Sprintf("http://localhost:8081/blue-lion/read/ref-data/%d", id),
@@ -182,6 +189,13 @@ func Mergers(slice *[]JsonMerger) error {
 	)
 }
 
+func EnrichedMergersPositions(slice *[]JsonEnrichedMerger) error {
+	return RestGetByUrl("EnrichedMergersPositions",
+		"http://localhost:8081/blue-lion/read/enriched-mergers-positions",
+		slice,
+	)
+}
+
 func Positions(slice *[]JsonPosition) error {
 	return RestGetByUrl("Positions",
 		"http://localhost:8081/blue-lion/read/positions",
@@ -192,6 +206,13 @@ func Positions(slice *[]JsonPosition) error {
 func PositionsBySymbolPortfolioID(symbol string, portfolioId int, ret *JsonPosition) error {
 	return RestGetByUrl("PositionBySymbolPortfolioID",
 		fmt.Sprintf("http://localhost:8081/blue-lion/read/positions?symbol=%s&portfolioId=%d", symbol, portfolioId),
+		ret,
+	)
+}
+
+func PositionsByID(id int, ret *JsonPosition) error {
+	return RestGetByUrl("PositionsByID",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/positions/%d", id),
 		ret,
 	)
 }

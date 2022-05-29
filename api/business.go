@@ -163,3 +163,17 @@ func ConfidenceToInt(c string) int {
 	}
 	return 0
 }
+
+func MergerStatusToInt(c string) int {
+	switch c {
+	case "P":
+		return 4
+	case "O":
+		return 3
+	case "C":
+		return 2
+	case "B":
+		return 1
+	}
+	return 0
+}
