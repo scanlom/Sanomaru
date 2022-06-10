@@ -286,7 +286,7 @@ type JsonPortfolio struct {
 	ValueTotalCapital   float64 `json:"valueTotalCapital" db:"value_total_capital"`
 	IndexTotalCapital   float64 `json:"indexTotalCapital" db:"index_total_capital"`
 	DivisorTotalCapital float64 `json:"divisorTotalCapital" db:"divisor_total_capital"`
-	CostBasis           float64 `json:"costBasis" db:"cost_basis"`
+	TotalCashInfusion   float64 `json:"totalCashInfusion" db:"total_cash_infusion"`
 	Model               float64 `json:"model" db:"model"`
 	Active              bool    `json:"active" db:"active"`
 }
@@ -299,16 +299,18 @@ type JsonEnrichedPortfolio struct {
 }
 
 type JsonPortfolioReturns struct {
-	ID          int     `json:"id"`
-	Name        string  `json:"name" db:"name"`
-	OneDay      float64 `json:"oneDay"`
-	OneWeek     float64 `json:"oneWeek"`
-	OneMonth    float64 `json:"oneMonth"`
-	ThreeMonths float64 `json:"threeMonths"`
-	OneYear     float64 `json:"oneYear"`
-	FiveYears   float64 `json:"fiveYears"`
-	TenYears    float64 `json:"tenYears"`
-	YearToDate  float64 `json:"yearToDate"`
+	ID               int     `json:"id"`
+	Name             string  `json:"name"`
+	OneDay           float64 `json:"oneDay"`
+	OneWeek          float64 `json:"oneWeek"`
+	OneMonth         float64 `json:"oneMonth"`
+	ThreeMonths      float64 `json:"threeMonths"`
+	OneYear          float64 `json:"oneYear"`
+	FiveYears        float64 `json:"fiveYears"`
+	TenYears         float64 `json:"tenYears"`
+	YearToDate       float64 `json:"yearToDate"`
+	ProfitYearToDate float64 `json:"profitYearToDate"`
+	ProfitLifetime   float64 `json:"profitLifetime"`
 }
 
 type JsonPortfolioHistory struct {

@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/schema"
 	"github.com/scanlom/Sanomaru/api"
 	"github.com/scanlom/Sanomaru/cmn"
 )
@@ -38,17 +39,13 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/write/positions/{id}", PositionsByID).Methods("PUT")
 	router.HandleFunc("/blue-lion/write/positions", Positions).Methods("POST")
 	router.HandleFunc("/blue-lion/write/portfolios-history/{id}", PortfoliosHistoryByID).Methods("PUT")
+	router.HandleFunc("/blue-lion/write/portfolios-history", PortfoliosHistoryByDateDelete).Methods("DELETE")
 	router.HandleFunc("/blue-lion/write/portfolios-history", PortfoliosHistory).Methods("POST")
-	router.HandleFunc("/blue-lion/write/positions-history", PositionsHistory).Methods("POST")
 	router.HandleFunc("/blue-lion/write/positions-history/{id}", PositionsHistoryByID).Methods("PUT")
+	router.HandleFunc("/blue-lion/write/positions-history", PositionsHistoryByDateDelete).Methods("DELETE")
+	router.HandleFunc("/blue-lion/write/positions-history", PositionsHistory).Methods("POST")
 	router.HandleFunc("/blue-lion/write/transactions", Transactions).Methods("POST")
 	router.HandleFunc("/blue-lion/write/transactions/{id}", TransactionsByID).Methods("PUT")
-}
-
-func RestHandleOptions(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("RestHandleOptions", w, r)
-	w.WriteHeader(http.StatusOK)
-	cmn.Exit("RestHandleOptions", nil)
 }
 
 func RestHandlePost(w http.ResponseWriter, r *http.Request, msg string, ptr interface{}, obj interface{}, table string) {
@@ -94,13 +91,6 @@ func RestHandlePut(w http.ResponseWriter, r *http.Request, msg string, ptr inter
 func RestHandleDelete(w http.ResponseWriter, r *http.Request, msg string, table string) {
 	cmn.Enter(msg, w, r)
 
-	if r.Method == http.MethodOptions {
-		// If this is a preflight check, simply return OK
-		w.WriteHeader(http.StatusOK)
-		cmn.Exit(msg, http.StatusOK)
-		return
-	}
-
 	params := mux.Vars(r)
 	id := params["id"]
 
@@ -112,8 +102,33 @@ func RestHandleDelete(w http.ResponseWriter, r *http.Request, msg string, table 
 
 	_, err = db.Exec(fmt.Sprintf("DELETE FROM %s where id=%s", table, id))
 	if err != nil {
-		log.Println(err)
-		w.WriteHeader(http.StatusInternalServerError)
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	cmn.Exit(msg, http.StatusOK)
+}
+
+func RestHandleDeleteByDate(w http.ResponseWriter, r *http.Request, msg string, table string) {
+	cmn.Enter(msg, w, r)
+
+	args := new(cmn.RestDateInput)
+	decoder := schema.NewDecoder()
+	err := decoder.Decode(args, r.URL.Query())
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		return
+	}
+
+	db, err := cmn.DbConnect()
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	_, err = db.Exec(fmt.Sprintf("DELETE FROM %s where date='%s'", table, args.Date))
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -381,6 +396,14 @@ func EnrichedMergersJournal(w http.ResponseWriter, r *http.Request) {
 
 func EnrichedProjectionsJournalByIDDelete(w http.ResponseWriter, r *http.Request) {
 	RestHandleDelete(w, r, "Write-EnrichedProjectionsJournalByIDDelete", "projections_journal")
+}
+
+func PortfoliosHistoryByDateDelete(w http.ResponseWriter, r *http.Request) {
+	RestHandleDeleteByDate(w, r, "Write-PortfoliosHistoryByDateDelete", "portfolios_history")
+}
+
+func PositionsHistoryByDateDelete(w http.ResponseWriter, r *http.Request) {
+	RestHandleDeleteByDate(w, r, "Write-PositionsHistoryByDateDelete", "positions_history")
 }
 
 func EnrichedProjectionsJournalByID(w http.ResponseWriter, r *http.Request) {

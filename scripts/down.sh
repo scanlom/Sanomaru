@@ -1,6 +1,7 @@
 #!/bin/bash
 
 pkill -f bin/cache
+pkill -f bin/run
 pkill -f bin/write
 pkill -f bin/read
 pkill -f bin/utils
