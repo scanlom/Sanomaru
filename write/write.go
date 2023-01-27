@@ -147,7 +147,6 @@ func MarketDataByID(w http.ResponseWriter, r *http.Request) {
 	id := params["id"]
 
 	var ret api.JsonMarketData
-	log.Println(r.Body)
 	err := json.NewDecoder(r.Body).Decode(&ret)
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)

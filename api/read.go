@@ -224,6 +224,13 @@ func EnrichedPositionsBySymbolPortfolioID(symbol string, portfolioId int, ret *J
 	)
 }
 
+func EnrichedPositionsByID(id int, ret *JsonEnrichedPosition) error {
+	return RestGetByUrl("EnrichedPositionsByID",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/enriched-positions/%d", id),
+		ret,
+	)
+}
+
 func Portfolios(slice *[]JsonPortfolio) error {
 	return RestGetByUrl("Portfolios",
 		"http://localhost:8081/blue-lion/read/portfolios",
@@ -265,9 +272,17 @@ func PortfoliosHistoryPortfolioIDDate(portfolioId int, date string, ret *JsonPor
 		ret,
 	)
 }
+
 func PositionsHistoryByPortfolioIDDate(portfolioId int, date string, slice *[]JsonPositionHistory) error {
 	return RestGetByUrl("PositionsHistoryByPortfolioIDDate",
 		fmt.Sprintf("http://localhost:8081/blue-lion/read/positions-history?portfolioId=%d&date=%s", portfolioId, date),
 		slice,
+	)
+}
+
+func PositionsHistoryFirst(positionId int, date string, ret *JsonPositionHistory) error {
+	return RestGetByUrl("PositionsHistoryFirst",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/positions-history-first?positionId=%d", positionId),
+		ret,
 	)
 }

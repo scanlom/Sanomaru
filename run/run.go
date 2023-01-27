@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"time"
@@ -13,6 +14,8 @@ import (
 
 func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/run/job-valuation-cut", JobValuationCut).Methods("GET")
+	router.HandleFunc("/blue-lion/run/execute-book", ExecuteBook).Methods("POST")
+	router.HandleFunc("/blue-lion/run/execute-roll-back", ExecuteRollBack).Methods("GET")
 }
 
 func JobValuationCut(w http.ResponseWriter, r *http.Request) {
@@ -54,7 +57,7 @@ func JobValuationCut(w http.ResponseWriter, r *http.Request) {
 			}
 
 			positions[i].Price = md.Last
-			positions[i].Value = cmn.Round(positions[i].Price * (1.0 / fx) * positions[i].Quantity, 0.01)
+			positions[i].Value = cmn.Round(positions[i].Price*(1.0/fx)*positions[i].Quantity, 0.01)
 			positions[i].Index = positions[i].Value * positions[i].Divisor
 			err = api.PutPosition(positions[i])
 			if err != nil {
@@ -148,6 +151,38 @@ func JobValuationCut(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	cmn.Exit("Run-JobValuationCut", nil)
+}
+
+func ExecuteBook(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Run-ExecuteBook", w, r)
+
+	var ret api.JsonTransaction
+	err := json.NewDecoder(r.Body).Decode(&ret)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	// Get the appropriate befores
+	err = api.EnrichedPositionsByID(ret.PositionID, &ret.PositionBefore)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	// Do the work
+	// Get the appropriate afters
+	// Save down the transaction
+
+	json.NewEncoder(w).Encode(ret)
+	cmn.Exit("Run-ExecuteBook", ret)
+}
+
+func ExecuteRollBack(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Run-ExecuteRollBack", w, r)
+
+	w.WriteHeader(http.StatusOK)
+	cmn.Exit("Run-ExecuteRollBack", nil)
 }
 
 func main() {

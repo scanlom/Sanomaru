@@ -59,6 +59,10 @@ type RestPositionIDInput struct {
 	PositionID int `schema:"positionId"`
 }
 
+type RestPortfolioIDInput struct {
+	PortfolioID int `schema:"portfolioId"`
+}
+
 type RestRefDataIDInput struct {
 	RefDataID int `schema:"refDataId"`
 }

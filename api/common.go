@@ -368,6 +368,7 @@ type JsonTransaction struct {
 	PositionAfter   types.JSONText `json:"positionAfter" db:"position_after"`
 	PortfolioBefore types.JSONText `json:"portfolioBefore" db:"portfolio_before"`
 	PortfolioAfter  types.JSONText `json:"portfolioAfter" db:"portfolio_after"`
+	Note            string         `json:"note" db:"note"`
 }
 
 func JsonToNamedInsertInternal(t reflect.Type, cols *string, params *string) {

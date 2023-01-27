@@ -62,15 +62,18 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/positions", PositionsBySymbolPortfolioID).Queries("symbol", "", "portfolioId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/positions", Positions).Methods("GET")
 	router.HandleFunc("/blue-lion/read/positions-history", PositionsHistoryByPortfolioIDDate).Queries("portfolioId", "", "date", "").Methods("GET")
+	router.HandleFunc("/blue-lion/read/positions-history-first", PositionsHistoryFirst).Queries("positionId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-positions/{id}", EnrichedPositionsByID).Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-positions", EnrichedPositionsBySymbolPortfolioID).Queries("symbol", "", "portfolioId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-positions", EnrichedPositionsByPortfolioID).Queries("portfolioId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-positions-all", EnrichedPositionsAllByPortfolioID).Queries("portfolioId", "").Methods("GET")
+	router.HandleFunc("/blue-lion/read/enriched-positions-all", EnrichedPositionsAll).Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-positions-history", EnrichedPositionsHistoryByPortfolioIDDate).Queries("portfolioId", "", "date", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/portfolio-returns/{id}", PortfolioReturnsByID).Methods("GET")
 	router.HandleFunc("/blue-lion/read/portfolio-returns", PortfolioReturnsByDate).Queries("date", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/portfolio-returns", PortfolioReturns).Methods("GET")
 	router.HandleFunc("/blue-lion/read/transactions", TransactionsByPositionID).Methods("GET").Queries("positionId", "").Methods("GET")
+	router.HandleFunc("/blue-lion/read/transactions", TransactionsByPortfolioID).Methods("GET").Queries("portfolioId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/transactions", Transactions).Methods("GET")
 	router.Methods("GET").Path("/blue-lion/read/scalar").HandlerFunc(Scalar)
 }
@@ -1053,7 +1056,7 @@ func Portfolios(w http.ResponseWriter, r *http.Request) {
 func Transactions(w http.ResponseWriter, r *http.Request) {
 	foo := api.JsonTransaction{}
 	ret := []api.JsonTransaction{}
-	RestHandleGet(w, r, "Read-Transactions", &ret, foo, "transactions ORDER BY date DESC")
+	RestHandleGet(w, r, "Read-Transactions", &ret, foo, "transactions ORDER BY date DESC LIMIT 50")
 }
 
 func TransactionsByPositionID(w http.ResponseWriter, r *http.Request) {
@@ -1076,6 +1079,28 @@ func TransactionsByPositionID(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(&ret)
 
 	cmn.Exit("Read-TransactionsByPositionID", ret)
+}
+
+func TransactionsByPortfolioID(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-TransactionsByPortfolioID", w, r)
+
+	args := new(cmn.RestPortfolioIDInput)
+	decoder := schema.NewDecoder()
+	err := decoder.Decode(args, r.URL.Query())
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		return
+	}
+
+	ret := []api.JsonTransaction{}
+	err = cmn.DbSelect(&ret, api.JsonToSelect(api.JsonTransaction{}, fmt.Sprintf("transactions WHERE portfolio_id=%d ORDER BY date DESC", args.PortfolioID), ""))
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(&ret)
+
+	cmn.Exit("Read-TransactionsByPortfolioID", ret)
 }
 
 func PortfoliosByID(w http.ResponseWriter, r *http.Request) {
@@ -1214,6 +1239,28 @@ func PortfoliosHistoryByPortfolioIDDate(w http.ResponseWriter, r *http.Request) 
 	cmn.Exit("Read-PortfoliosHistoryByPortfolioIDDate", ret)
 }
 
+func PositionsHistoryFirst(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-PositionsHistoryFirst", w, r)
+
+	args := new(cmn.RestPositionIDInput)
+	decoder := schema.NewDecoder()
+	err := decoder.Decode(args, r.URL.Query())
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		return
+	}
+
+	ret := api.JsonPositionHistory{}
+	err = cmn.DbGet(&ret, api.JsonToSelect(api.JsonPositionHistory{}, fmt.Sprintf("positions_history WHERE position_id=%d and date=(select min(date) from positions_history where position_id=%d)", args.PositionID, args.PositionID), ""))
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(&ret)
+
+	cmn.Exit("Read-PositionsHistoryFirst", ret)
+}
+
 func PositionsHistoryByPortfolioIDDate(w http.ResponseWriter, r *http.Request) {
 	cmn.Enter("Read-PositionsHistoryByPortfolioIDDate", w, r)
 
@@ -1315,6 +1362,19 @@ func CalculateReturn(ID int, index float64, date string, interval string, years 
 	}
 	return ret
 }
+
+/*func CalculatePositionReturnLifetime(ID int, index float64, date string) float64 {
+	var start float64
+	var ret float64
+	query := "select index from portfolios_history where portfolio_id=%d and date=" +
+		"(select max(date) from portfolios_history where portfolio_id=%d and date <= (select date('%s') - interval '%s'))"
+	// If the value is not present, leave the return zero, don't handle error
+	_ = cmn.DbGet(&start, fmt.Sprintf(query, ID, ID, date, interval))
+	if start > 0 {
+		ret = cmn.Round(math.Pow(index/start, 1/years)-1, 0.0001)
+	}
+	return ret
+}*/
 
 func EnrichPortfolioReturns(p api.JsonPortfolio, date string) (api.JsonPortfolioReturns, error) {
 	pr := api.JsonPortfolioReturns{}
@@ -1462,11 +1522,11 @@ func EnrichPosition(p api.JsonPosition) (api.JsonEnrichedPosition, error) {
 	return ep, nil
 }
 
-func EnrichedPositions(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-EnrichedPositions", w, r)
+func EnrichedPositionsAll(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-EnrichedPositionsAll", w, r)
 
 	var positions []api.JsonPosition
-	err := api.Positions(&positions)
+	err := cmn.DbSelect(&positions, api.JsonToSelect(api.JsonPosition{}, "positions ORDER BY id ASC", ""))
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
@@ -1484,7 +1544,7 @@ func EnrichedPositions(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-EnrichedPositions", ret)
+	cmn.Exit("Read-EnrichedPositionsAll", ret)
 }
 
 type EnrichedPositionsByPortfolioIDInput struct {
