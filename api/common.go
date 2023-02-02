@@ -298,7 +298,7 @@ type JsonEnrichedPortfolio struct {
 	PercentDebt  float64 `json:"percentDebt"`
 }
 
-type JsonPortfolioReturns struct {
+type JsonReturns struct {
 	ID               int     `json:"id"`
 	Name             string  `json:"name"`
 	OneDay           float64 `json:"oneDay"`

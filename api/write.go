@@ -12,22 +12,22 @@ func RestPostByUrl(msg string, url string, data interface{}) error {
 	log.Printf("Api.%s: Called...", msg)
 	log.Printf("Api.%s: %s", msg, url)
 
-    json, err := json.Marshal(data)
-    if err != nil {
-        return err
-    }
-	
-    req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(json))
-    if err != nil {
-        return err
-    }
-    
-    req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	json, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(json))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	client := &http.Client{}
-    resp, err := client.Do(req)
-    if err != nil {
-        return err
-    }
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
 
 	log.Printf("Api.%s: Complete, status code %s", msg, resp.Status)
 	return nil
@@ -37,22 +37,22 @@ func RestPutByUrl(msg string, url string, data interface{}) error {
 	log.Printf("Api.%s: Called...", msg)
 	log.Printf("Api.%s: %s", msg, url)
 
-    json, err := json.Marshal(data)
-    if err != nil {
-        return err
-    }
-	
-    req, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(json))
-    if err != nil {
-        return err
-    }
-    
-    req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	json, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(json))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	client := &http.Client{}
-    resp, err := client.Do(req)
-    if err != nil {
-        return err
-    }
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
 
 	log.Printf("Api.%s: Complete, status code %s", msg, resp.Status)
 	return nil
@@ -62,17 +62,17 @@ func RestDeleteByUrl(msg string, url string) error {
 	log.Printf("Api.%s: Called...", msg)
 	log.Printf("Api.%s: %s", msg, url)
 
-    req, err := http.NewRequest(http.MethodDelete, url, nil)
-    if err != nil {
-        return err
-    }
-    
-    req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	client := &http.Client{}
-    resp, err := client.Do(req)
-    if err != nil {
-        return err
-    }
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
 
 	log.Printf("Api.%s: Complete, status code %s", msg, resp.Status)
 	return nil
@@ -88,6 +88,13 @@ func PostPortfolioHistory(data JsonPortfolioHistory) error {
 func PostPositionHistory(data JsonPositionHistory) error {
 	return RestPostByUrl("PostPositionHistory",
 		fmt.Sprintf("http://localhost:8083/blue-lion/write/positions-history"),
+		data,
+	)
+}
+
+func PostTransaction(data JsonTransaction) error {
+	return RestPostByUrl("PostTransaction",
+		fmt.Sprintf("http://localhost:8083/blue-lion/write/transactions"),
 		data,
 	)
 }

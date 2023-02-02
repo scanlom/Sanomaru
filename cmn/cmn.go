@@ -28,6 +28,13 @@ const CONST_PORTFOLIO_QUICK = 7
 const CONST_PORTFOLIO_PORTFOLIO = 8
 const CONST_PORTFOLIO_NONE = 99
 
+const CONST_TXN_TYPE_BUY = 1
+const CONST_TXN_TYPE_SELL = 2
+const CONST_TXN_TYPE_DIV = 3
+const CONST_TXN_TYPE_CI = 4
+const CONST_TXN_TYPE_DI = 5
+const CONST_TXN_TYPE_INT = 6
+
 const CONST_FX_GBP = 76.34
 const CONST_FX_HKD = 7.79
 const CONST_FX_ILS = 342
@@ -81,6 +88,11 @@ type RestSymbolDateInput struct {
 
 type RestPortfolioIDDateInput struct {
 	PortfolioID int    `schema:"portfolioId"`
+	Date        string `schema:"date"`
+}
+
+type RestPositionIDDateInput struct {
+	PositionID int    `schema:"positionId"`
 	Date        string `schema:"date"`
 }
 

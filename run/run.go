@@ -14,8 +14,8 @@ import (
 
 func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/run/job-valuation-cut", JobValuationCut).Methods("GET")
-	router.HandleFunc("/blue-lion/run/execute-book", ExecuteBook).Methods("POST")
-	router.HandleFunc("/blue-lion/run/execute-roll-back", ExecuteRollBack).Methods("GET")
+	router.HandleFunc("/blue-lion/run/execute-book-transaction", ExecuteBookTransaction).Methods("POST")
+	router.HandleFunc("/blue-lion/run/execute-roll-back-transaction", ExecuteRollBackTransaction).Methods("GET")
 }
 
 func JobValuationCut(w http.ResponseWriter, r *http.Request) {
@@ -153,10 +153,12 @@ func JobValuationCut(w http.ResponseWriter, r *http.Request) {
 	cmn.Exit("Run-JobValuationCut", nil)
 }
 
-func ExecuteBook(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Run-ExecuteBook", w, r)
+func ExecuteBookTransaction(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Run-ExecuteBookTransaction", w, r)
 
 	var ret api.JsonTransaction
+	var position api.JsonEnrichedPosition
+	var portfolio api.JsonEnrichedPortfolio
 	err := json.NewDecoder(r.Body).Decode(&ret)
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
@@ -164,25 +166,150 @@ func ExecuteBook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get the appropriate befores
-	err = api.EnrichedPositionsByID(ret.PositionID, &ret.PositionBefore)
+	err = api.EnrichedPositionsByID(ret.PositionID, &position)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	err = api.EnrichedPortfoliosByID(ret.PortfolioID, &portfolio)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	// Save the befores
+	ret.PositionBefore, err = json.Marshal(position)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	ret.PortfolioBefore, err = json.Marshal(portfolio)
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	// Do the work
+	switch ret.Type {
+	case cmn.CONST_TXN_TYPE_BUY:
+		log.Println("Run-ExecuteBookTransaction: Handling CONST_TXN_TYPE_BUY")
+		portfolio.Cash -= ret.Value
+		position.Quantity += ret.Quantity
+		position.Value += ret.Value
+		position.TotalCashInfusion += ret.Value
+		position.CostBasis += ret.Value
+		if position.Index == 0.0 {
+			// Start index at 100.0 so we can easily check total pct gain
+			position.Index = 100.0
+		}
+		position.Divisor = position.Index / position.Value
+	case cmn.CONST_TXN_TYPE_SELL:
+		log.Println("Run-ExecuteBookTransaction: Handling CONST_TXN_TYPE_SELL")
+		portfolio.Cash += ret.Value
+		position.Quantity -= ret.Quantity
+		position.Value -= ret.Value
+		position.TotalCashInfusion -= ret.Value
+
+
+		/*position_history['totalCashInfusion'] -= txn['value']
+		# Did we sell down to zero? Float qty's (VNE) caught us out, so compare the integer
+		# Note: We don't handle CONST_PRICING_TYPE_BY_VALUE positions being sold down to zero,
+		# but that's ok as we have not had any in the portfolios we track yet (so punt)
+		if position_history['pricingType'] == db.CONST_PRICING_TYPE_BY_PRICE and int(txn['quantity']) == int(position_history['quantity']):
+			position_history['costBasis'] = 0.0
+			position_history['quantity'] = 0.0
+			position_history['value'] = 0.0
+			# Index is calculated one final time, and divisor is frozen at the final value
+			position_history['index'] = txn['value'] * position_history['divisor']
+			# There may be a sell after the last history row back when we had gaps, so force an update to the position table below in update_histories_and_currents
+			position_history['forceUpdate'] = True
+			log.info( "process_txn: %s (%d) sold to zero, index frozen at %f" % (txn['positionBefore']['symbol'],  position_history['positionId'], position_history['index']) )
+		else:
+			if position_history['pricingType'] == db.CONST_PRICING_TYPE_BY_PRICE:
+				position_history['costBasis'] -= position_history['costBasis'] * (txn['quantity'] / position_history['quantity'])
+			else:
+				position_history['costBasis'] -= position_history['costBasis'] * (txn['value'] / position_history['value'])					
+			position_history['value'] -= txn['value']
+			position_history['quantity'] -= txn['quantity']
+			position_history['divisor'] = position_history['index'] / position_history['value']*/
+	case cmn.CONST_TXN_TYPE_DIV:
+		log.Println("Run-ExecuteBookTransaction: Handling CONST_TXN_TYPE_DIV")
+		portfolio.Cash += ret.Value
+		position.AccumulatedDividends += ret.Value
+		// A dividend may come in after a position is sold down, we've decided to drop this for final index calculation, as there is no good way to handle it
+		if position.Value > 0.0 {
+			// Due to the dividend the index will increase, but then we basically immediately take the dividend out
+			position.Index = (position.Value + ret.Value) * position.Divisor
+			position.Divisor = position.Index / position.Value
+		}
+	case cmn.CONST_TXN_TYPE_CI:
+		log.Println("Run-ExecuteBookTransaction: Handling CONST_TXN_TYPE_CI")
+	case cmn.CONST_TXN_TYPE_DI:
+		log.Println("Run-ExecuteBookTransaction: Handling CONST_TXN_TYPE_DI")
+	case cmn.CONST_TXN_TYPE_INT:
+		log.Println("Run-ExecuteBookTransaction: Handling CONST_TXN_TYPE_INT")
+	default:
+		log.Println("Run-ExecuteBookTransaction: Unknown transaction type")
+		// Return error
+	}
+
+	// Save the currents
+	err = api.PutPosition(position.JsonPosition)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	err = api.PutPortfolio(portfolio.JsonPortfolio)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
 	// Get the appropriate afters
+	err = api.EnrichedPositionsByID(ret.PositionID, &position)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	err = api.EnrichedPortfoliosByID(ret.PortfolioID, &portfolio)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	// Save the afters
+	ret.PositionAfter, err = json.Marshal(position)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	ret.PortfolioAfter, err = json.Marshal(portfolio)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
 	// Save down the transaction
+	err = api.PostTransaction(ret)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
 
 	json.NewEncoder(w).Encode(ret)
-	cmn.Exit("Run-ExecuteBook", ret)
+	cmn.Exit("Run-ExecuteBookTransaction", ret)
 }
 
-func ExecuteRollBack(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Run-ExecuteRollBack", w, r)
+func ExecuteRollBackTransaction(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Run-ExecuteRollBackTransaction", w, r)
 
 	w.WriteHeader(http.StatusOK)
-	cmn.Exit("Run-ExecuteRollBack", nil)
+	cmn.Exit("Run-ExecuteRollBackTransaction", nil)
 }
 
 func main() {

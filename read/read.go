@@ -62,6 +62,7 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/positions", PositionsBySymbolPortfolioID).Queries("symbol", "", "portfolioId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/positions", Positions).Methods("GET")
 	router.HandleFunc("/blue-lion/read/positions-history", PositionsHistoryByPortfolioIDDate).Queries("portfolioId", "", "date", "").Methods("GET")
+	router.HandleFunc("/blue-lion/read/positions-history", PositionsHistoryByPositionIDDate).Queries("positionId", "", "date", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/positions-history-first", PositionsHistoryFirst).Queries("positionId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-positions/{id}", EnrichedPositionsByID).Methods("GET")
 	router.HandleFunc("/blue-lion/read/enriched-positions", EnrichedPositionsBySymbolPortfolioID).Queries("symbol", "", "portfolioId", "").Methods("GET")
@@ -72,6 +73,7 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/portfolio-returns/{id}", PortfolioReturnsByID).Methods("GET")
 	router.HandleFunc("/blue-lion/read/portfolio-returns", PortfolioReturnsByDate).Queries("date", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/portfolio-returns", PortfolioReturns).Methods("GET")
+	router.HandleFunc("/blue-lion/read/position-returns/{id}", PositionReturnsByID).Methods("GET")
 	router.HandleFunc("/blue-lion/read/transactions", TransactionsByPositionID).Methods("GET").Queries("positionId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/transactions", TransactionsByPortfolioID).Methods("GET").Queries("portfolioId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/transactions", Transactions).Methods("GET")
@@ -1056,7 +1058,7 @@ func Portfolios(w http.ResponseWriter, r *http.Request) {
 func Transactions(w http.ResponseWriter, r *http.Request) {
 	foo := api.JsonTransaction{}
 	ret := []api.JsonTransaction{}
-	RestHandleGet(w, r, "Read-Transactions", &ret, foo, "transactions ORDER BY date DESC LIMIT 50")
+	RestHandleGet(w, r, "Read-Transactions", &ret, foo, "transactions ORDER BY date DESC, id DESC LIMIT 50")
 }
 
 func TransactionsByPositionID(w http.ResponseWriter, r *http.Request) {
@@ -1071,7 +1073,7 @@ func TransactionsByPositionID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ret := []api.JsonTransaction{}
-	err = cmn.DbSelect(&ret, api.JsonToSelect(api.JsonTransaction{}, fmt.Sprintf("transactions WHERE position_id=%d ORDER BY date DESC", args.PositionID), ""))
+	err = cmn.DbSelect(&ret, api.JsonToSelect(api.JsonTransaction{}, fmt.Sprintf("transactions WHERE position_id=%d ORDER BY date DESC, id DESC", args.PositionID), ""))
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
@@ -1093,7 +1095,7 @@ func TransactionsByPortfolioID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ret := []api.JsonTransaction{}
-	err = cmn.DbSelect(&ret, api.JsonToSelect(api.JsonTransaction{}, fmt.Sprintf("transactions WHERE portfolio_id=%d ORDER BY date DESC", args.PortfolioID), ""))
+	err = cmn.DbSelect(&ret, api.JsonToSelect(api.JsonTransaction{}, fmt.Sprintf("transactions WHERE portfolio_id=%d and position_id=0 ORDER BY date DESC, id DESC", args.PortfolioID), ""))
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
@@ -1289,6 +1291,34 @@ func PositionsHistoryByPortfolioIDDate(w http.ResponseWriter, r *http.Request) {
 	cmn.Exit("Read-PositionsHistoryByPortfolioIDDate", ret)
 }
 
+func PositionsHistoryByPositionIDDate(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-PositionsHistoryByPositionIDDate", w, r)
+
+	args := new(cmn.RestPositionIDDateInput)
+	decoder := schema.NewDecoder()
+	err := decoder.Decode(args, r.URL.Query())
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		return
+	}
+
+	db, err := cmn.DbConnect()
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	ret := api.JsonPositionHistory{}
+	err = db.Get(&ret, api.JsonToSelect(api.JsonPositionHistory{}, fmt.Sprintf("positions_history WHERE position_id=%d and date='%s'", args.PositionID, args.Date), ""))
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(&ret)
+
+	cmn.Exit("Read-PositionsHistoryByPositionIDDate", ret)
+}
+
 func PortfoliosHistoryMaxDate(w http.ResponseWriter, r *http.Request) {
 	cmn.Enter("Read-PortfoliosHistoryMaxDate", w, r)
 
@@ -1350,49 +1380,39 @@ func PositionsBySymbolPortfolioID(w http.ResponseWriter, r *http.Request) {
 	cmn.Exit("Read-PositionsBySymbolPortfolioID", ret)
 }
 
-func CalculateReturn(ID int, index float64, date string, interval string, years float64) float64 {
+func CalculateReturn(table string, idCol string, id int, index float64, date string, interval string, years float64) float64 {
 	var start float64
 	var ret float64
-	query := "select index from portfolios_history where portfolio_id=%d and date=" +
-		"(select max(date) from portfolios_history where portfolio_id=%d and date <= (select date('%s') - interval '%s'))"
+	query := "select index from %s where %s=%d and date=" +
+		"(select max(date) from %s where %s=%d and date <= (select date('%s') - interval '%s'))"
 	// If the value is not present, leave the return zero, don't handle error
-	_ = cmn.DbGet(&start, fmt.Sprintf(query, ID, ID, date, interval))
+	_ = cmn.DbGet(&start, fmt.Sprintf(query, table, idCol, id, table, idCol, id, date, interval))
 	if start > 0 {
 		ret = cmn.Round(math.Pow(index/start, 1/years)-1, 0.0001)
 	}
 	return ret
 }
 
-/*func CalculatePositionReturnLifetime(ID int, index float64, date string) float64 {
-	var start float64
-	var ret float64
-	query := "select index from portfolios_history where portfolio_id=%d and date=" +
-		"(select max(date) from portfolios_history where portfolio_id=%d and date <= (select date('%s') - interval '%s'))"
-	// If the value is not present, leave the return zero, don't handle error
-	_ = cmn.DbGet(&start, fmt.Sprintf(query, ID, ID, date, interval))
-	if start > 0 {
-		ret = cmn.Round(math.Pow(index/start, 1/years)-1, 0.0001)
-	}
-	return ret
-}*/
+func EnrichReturns(table string, idCol string, id int, name string, value float64, index float64, tci float64, divs float64, date string) (api.JsonReturns) {
+	r := api.JsonReturns{}
+	r.ID = id
+	r.Name = name
+	r.OneDay = CalculateReturn(table, idCol, id, index, date, "1 day", 1)
+	r.OneWeek = CalculateReturn(table, idCol, id, index, date, "1 week", 1)
+	r.OneMonth = CalculateReturn(table, idCol, id, index, date, "1 month", 1)
+	r.ThreeMonths = CalculateReturn(table, idCol, id, index, date, "3 months", 1)
+	r.OneYear = CalculateReturn(table, idCol, id, index, date, "1 year", 1)
+	r.FiveYears = CalculateReturn(table, idCol, id, index, date, "5 years", 5)
+	r.TenYears = CalculateReturn(table, idCol, id, index, date, "10 years", 10)
+	r.ProfitLifetime = value - tci + divs
+	return r
+}
 
-func EnrichPortfolioReturns(p api.JsonPortfolio, date string) (api.JsonPortfolioReturns, error) {
-	pr := api.JsonPortfolioReturns{}
-	pr.ID = p.ID
-	pr.Name = p.Name
-	pr.OneDay = CalculateReturn(p.ID, p.Index, date, "1 day", 1)
-	pr.OneWeek = CalculateReturn(p.ID, p.Index, date, "1 week", 1)
-	pr.OneMonth = CalculateReturn(p.ID, p.Index, date, "1 month", 1)
-	pr.ThreeMonths = CalculateReturn(p.ID, p.Index, date, "3 months", 1)
-	pr.OneYear = CalculateReturn(p.ID, p.Index, date, "1 year", 1)
-	pr.FiveYears = CalculateReturn(p.ID, p.Index, date, "5 years", 5)
-	pr.TenYears = CalculateReturn(p.ID, p.Index, date, "10 years", 10)
-	pr.ProfitLifetime = p.Value - p.TotalCashInfusion
-
+func EnrichYTDPortfolioReturns(r *api.JsonReturns, value float64, index float64, tci float64, date string) (error) {
 	yearStartDate := ""
 	dateParsed, err := time.Parse("2006-01-02", date)
 	if err != nil {
-		return pr, err
+		return err
 	}
 	if dateParsed.Month() == 1 && dateParsed.Day() == 1 {
 		yearStartDate = fmt.Sprintf("%d-%02d-%02d", dateParsed.Year()-1, dateParsed.Month(), dateParsed.Day())
@@ -1401,16 +1421,41 @@ func EnrichPortfolioReturns(p api.JsonPortfolio, date string) (api.JsonPortfolio
 	}
 
 	physd := api.JsonPortfolioHistory{}
-	err = api.PortfoliosHistoryPortfolioIDDate(p.ID, yearStartDate, &physd)
+	err = api.PortfoliosHistoryPortfolioIDDate(r.ID, yearStartDate, &physd)
 	if err != nil {
-		return pr, err
+		return err
 	}
 
 	if physd.Index > 0 {
-		pr.YearToDate = cmn.Round(p.Index/physd.Index-1, 0.0001)
+		r.YearToDate = cmn.Round(index/physd.Index-1, 0.0001)
 	}
-	pr.ProfitYearToDate = p.Value - physd.Value - (p.TotalCashInfusion - physd.TotalCashInfusion)
-	return pr, nil
+	r.ProfitYearToDate = value - physd.Value - (tci - physd.TotalCashInfusion)
+	return nil
+}
+
+func EnrichYTDPositionReturns(r *api.JsonReturns, value float64, index float64, tci float64, divs float64, date string) (error) {
+	yearStartDate := ""
+	dateParsed, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return err
+	}
+	if dateParsed.Month() == 1 && dateParsed.Day() == 1 {
+		yearStartDate = fmt.Sprintf("%d-%02d-%02d", dateParsed.Year()-1, dateParsed.Month(), dateParsed.Day())
+	} else {
+		yearStartDate = fmt.Sprintf("%d-%02d-%02d", dateParsed.Year(), 1, 1)
+	}
+
+	physd := api.JsonPositionHistory{}
+	err = api.PositionsHistoryByPositionIDDate(r.ID, yearStartDate, &physd)
+	if err != nil {
+		return err
+	}
+
+	if physd.Index > 0 {
+		r.YearToDate = cmn.Round(index/physd.Index-1, 0.0001)
+	}
+	r.ProfitYearToDate = value - physd.Value - (tci - physd.TotalCashInfusion) + (divs - physd.AccumulatedDividends)
+	return nil
 }
 
 func PortfolioReturnsByID(w http.ResponseWriter, r *http.Request) {
@@ -1430,7 +1475,9 @@ func PortfolioReturnsByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ret, err := EnrichPortfolioReturns(portfolio, time.Now().Format("2006-01-02"))
+	ret := EnrichReturns("portfolios_history", "portfolio_id", portfolio.ID, portfolio.Name, portfolio.Value, portfolio.Index, portfolio.TotalCashInfusion, 
+		0, time.Now().Format("2006-01-02"))
+	err = EnrichYTDPortfolioReturns(&ret, portfolio.Value, portfolio.Index, portfolio.TotalCashInfusion, time.Now().Format("2006-01-02"))
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
@@ -1449,9 +1496,11 @@ func PortfolioReturns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ret := []api.JsonPortfolioReturns{}
+	ret := []api.JsonReturns{}
 	for i := range portfolios {
-		pr, err := EnrichPortfolioReturns(portfolios[i], time.Now().Format("2006-01-02"))
+		pr := EnrichReturns("portfolios_history", "portfolio_id", portfolios[i].ID, portfolios[i].Name, portfolios[i].Value, portfolios[i].Index, 
+			portfolios[i].TotalCashInfusion, 0, time.Now().Format("2006-01-02"))
+		err = EnrichYTDPortfolioReturns(&pr, portfolios[i].Value, portfolios[i].Index, portfolios[i].TotalCashInfusion, time.Now().Format("2006-01-02"))
 		if err != nil {
 			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 			return
@@ -1482,11 +1531,13 @@ func PortfolioReturnsByDate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ret := []api.JsonPortfolioReturns{}
+	ret := []api.JsonReturns{}
 	for i := range portfoliosHistory {
 		portfolio := portfoliosHistory[i].JsonPortfolio
 		portfolio.ID = portfoliosHistory[i].PortfolioID
-		pr, err := EnrichPortfolioReturns(portfolio, args.Date)
+		pr := EnrichReturns("portfolios_history", "portfolio_id", portfolio.ID, portfolio.Name, portfolio.Value, portfolio.Index, portfolio.TotalCashInfusion, 
+			0, args.Date)
+		err = EnrichYTDPortfolioReturns(&pr, portfolio.Value, portfolio.Index, portfolio.TotalCashInfusion, args.Date)
 		if err != nil {
 			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 			return
@@ -1497,6 +1548,33 @@ func PortfolioReturnsByDate(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(&ret)
 
 	cmn.Exit("Read-PortfolioReturnsByDate", ret)
+}
+
+func PositionReturnsByID(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-PositionReturnsByID", w, r)
+
+	params := mux.Vars(r)
+	id, err := strconv.Atoi(params["id"])
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	var ep api.JsonEnrichedPosition
+	err = api.EnrichedPositionsByID(id, &ep)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	ret := EnrichReturns("positions_history", "position_id", ep.ID, ep.Symbol, ep.Value, ep.Index, ep.TotalCashInfusion, ep.AccumulatedDividends, time.Now().Format("2006-01-02"))
+	err = EnrichYTDPositionReturns(&ret, ep.Value, ep.Index, ep.TotalCashInfusion, ep.AccumulatedDividends, time.Now().Format("2006-01-02"))
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(&ret)
+	cmn.Exit("Read-PositionReturnsByID", ret)
 }
 
 func EnrichPosition(p api.JsonPosition) (api.JsonEnrichedPosition, error) {
