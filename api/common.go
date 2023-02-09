@@ -185,6 +185,17 @@ type JsonCashflow struct {
 	DPS float64 `json:"dps"`
 }
 
+type JsonProjectionsStats struct {
+	Total  int  `json:"total"`
+	High   int  `json:"high"`
+	Medium int  `json:"medium"`
+	None   int  `json:"none"`
+	Blah   int  `json:"blah"`
+	Low    int  `json:"low"`
+	Fresh  int  `json:"fresh"`
+	PW1    bool `json:"pw1"`
+}
+
 type JsonEnrichedProjections struct {
 	JsonProjections
 	// Ref Data

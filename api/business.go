@@ -151,15 +151,15 @@ func EnrichProjections(p JsonProjections) (JsonEnrichedProjections, error) {
 func ConfidenceToInt(c string) int {
 	switch c {
 	case "H":
-		return 5
+		return cmn.CONST_CONFIDENCE_HIGH
 	case "M":
-		return 4
+		return cmn.CONST_CONFIDENCE_MEDIUM
 	case "N":
-		return 3
+		return cmn.CONST_CONFIDENCE_NONE
 	case "B":
-		return 2
+		return cmn.CONST_CONFIDENCE_BLAH
 	case "L":
-		return 1
+		return cmn.CONST_CONFIDENCE_LOW
 	}
 	return 0
 }

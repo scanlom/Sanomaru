@@ -26,6 +26,7 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/market-data-historical/year-summary", MDHYearSummaryBySymbol).Queries("symbol", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/market-data-historical", MDHByRefDataIDDate).Queries("refDataId", "", "date", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/ref-data/focus", RefDataFocus).Methods("GET")
+	router.HandleFunc("/blue-lion/read/ref-data/positions", RefDataPositions).Methods("GET")
 	router.HandleFunc("/blue-lion/read/ref-data/{id}", RefDataByID).Methods("GET")
 	router.HandleFunc("/blue-lion/read/ref-data", RefDataBySymbol).Queries("symbol", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/ref-data", RefData).Methods("GET")
@@ -531,6 +532,33 @@ func MDHBySymbol(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(&ret)
 
 	cmn.Exit("Read-MDHYearSummaryBySymbol", ret)
+}
+
+func RefDataPositions(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("RefDataPositions", w, r)
+
+	ret := []api.JsonRefData{}
+	positions := []api.JsonPosition{}
+	err := api.Positions(&positions)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	for i := range positions {
+		if positions[i].PricingType == cmn.CONST_PRICING_TYPE_BY_PRICE {
+			refData := api.JsonRefData{}
+			err = api.RefDataByID(positions[i].RefDataID, &refData)
+			if err != nil {
+				cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+				return
+			}
+			ret = append(ret, refData)
+		}
+	}
+	json.NewEncoder(w).Encode(&ret)
+
+	cmn.Exit("RefDataPositions", ret)
 }
 
 func RefDataFocus(w http.ResponseWriter, r *http.Request) {

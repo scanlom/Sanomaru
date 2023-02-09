@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"sort"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/scanlom/Sanomaru/api"
@@ -23,7 +24,19 @@ func EnrichedProjections(msg string, cache []api.JsonEnrichedProjections, err er
 	}
 }
 
-func CacheEnrichedProjections(positionsProjections *[]api.JsonEnrichedProjections, watchProjections *[]api.JsonEnrichedProjections, researchProjections *[]api.JsonEnrichedProjections) error {
+func ProjectionsStats(msg string, cache api.JsonProjectionsStats, err error) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cmn.Enter(msg, w, r)
+		if err != nil {
+			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+			return
+		}
+		json.NewEncoder(w).Encode(&cache)
+		cmn.Exit(msg, &cache)
+	}
+}
+
+func CacheEnrichedProjections(positionsProjections *[]api.JsonEnrichedProjections, watchProjections *[]api.JsonEnrichedProjections, researchProjections *[]api.JsonEnrichedProjections, stats *api.JsonProjectionsStats) error {
 	var projections []api.JsonProjections
 	err := api.Projections(&projections)
 	if err != nil {
@@ -37,10 +50,37 @@ func CacheEnrichedProjections(positionsProjections *[]api.JsonEnrichedProjection
 			cmn.ErrorLog(err)
 			return err
 		}
+		fresh := false
+		stats.Total++
+		switch api.ConfidenceToInt(ep.Confidence) {
+		case cmn.CONST_CONFIDENCE_LOW:
+			stats.Low++
+		case cmn.CONST_CONFIDENCE_BLAH:
+			stats.Blah++
+		case cmn.CONST_CONFIDENCE_NONE:
+			stats.None++
+		case cmn.CONST_CONFIDENCE_MEDIUM:
+			stats.Medium++
+		case cmn.CONST_CONFIDENCE_HIGH:
+			stats.High++
+		}
+		lastUpdate := cmn.DateStringToTime(ep.Date)
+		daysSince := time.Now().Sub(lastUpdate).Hours() / 24
+		if daysSince < 90 {
+			fresh = true
+			stats.Fresh++
+		}
+
 		if ep.PercentPortfolio > 0 {
 			*positionsProjections = append(*positionsProjections, ep)
+			if !fresh {
+				stats.PW1 = false
+			}
 		} else if ep.Watch {
 			*watchProjections = append(*watchProjections, ep)
+			if !fresh {
+				stats.PW1 = false
+			}
 		} else {
 			*researchProjections = append(*researchProjections, ep)
 		}
@@ -63,6 +103,11 @@ func CacheEnrichedProjections(positionsProjections *[]api.JsonEnrichedProjection
 		}
 		return api.ConfidenceToInt((*researchProjections)[i].Confidence) > api.ConfidenceToInt((*researchProjections)[j].Confidence)
 	})
+
+	if stats.PW1 && stats.Fresh <= (len(*positionsProjections)+len(*watchProjections)) {
+		stats.PW1 = false
+	}
+
 	return nil
 }
 
@@ -89,7 +134,8 @@ func main() {
 	var positionsProjections []api.JsonEnrichedProjections
 	var watchProjections []api.JsonEnrichedProjections
 	var researchProjections []api.JsonEnrichedProjections
-	err := CacheEnrichedProjections(&positionsProjections, &watchProjections, &researchProjections)
+	var stats api.JsonProjectionsStats
+	err := CacheEnrichedProjections(&positionsProjections, &watchProjections, &researchProjections, &stats)
 
 	var positionsProjectionsTotal []api.JsonEnrichedProjections
 	CacheEnrichedProjectionsTotal(&positionsProjectionsTotal, positionsProjections)
@@ -100,5 +146,6 @@ func main() {
 	router.HandleFunc("/blue-lion/cache/enriched-projections-positions-total", EnrichedProjections("Cache-EnrichedProjectionsPositionsTotal", positionsProjectionsTotal, err)).Methods("GET")
 	router.HandleFunc("/blue-lion/cache/enriched-projections-watch", EnrichedProjections("Cache-EnrichedProjectionsWatch", watchProjections, err)).Methods("GET")
 	router.HandleFunc("/blue-lion/cache/enriched-projections-research", EnrichedProjections("Cache-EnrichedProjectionsResearch", researchProjections, err)).Methods("GET")
+	router.HandleFunc("/blue-lion/cache/projections-stats", ProjectionsStats("Cache-ProjectionsStats", stats, err)).Methods("GET")
 	log.Fatal(http.ListenAndServe(":8084", router))
 }
