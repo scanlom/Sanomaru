@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -12,31 +13,15 @@ import (
 	"github.com/scanlom/Sanomaru/cmn"
 )
 
-func EnrichedProjections(msg string, cache []api.JsonEnrichedProjections, err error) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		cmn.Enter(msg, w, r)
-		if err != nil {
-			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
-			return
-		}
-		json.NewEncoder(w).Encode(&cache)
-		cmn.Exit(msg, &cache)
-	}
+type ProjectionsCache struct {
+	EnrichedProjections  []api.JsonEnrichedProjections
+	PositionsProjections []api.JsonEnrichedProjections
+	WatchProjections     []api.JsonEnrichedProjections
+	ResearchProjections  []api.JsonEnrichedProjections
+	Stats                api.JsonProjectionsStats
 }
 
-func ProjectionsStats(msg string, cache api.JsonProjectionsStats, err error) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		cmn.Enter(msg, w, r)
-		if err != nil {
-			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
-			return
-		}
-		json.NewEncoder(w).Encode(&cache)
-		cmn.Exit(msg, &cache)
-	}
-}
-
-func CacheEnrichedProjections(positionsProjections *[]api.JsonEnrichedProjections, watchProjections *[]api.JsonEnrichedProjections, researchProjections *[]api.JsonEnrichedProjections, stats *api.JsonProjectionsStats) error {
+func (cache *ProjectionsCache) CacheEnrichedProjections() error {
 	var projections []api.JsonProjections
 	err := api.Projections(&projections)
 	if err != nil {
@@ -50,65 +35,133 @@ func CacheEnrichedProjections(positionsProjections *[]api.JsonEnrichedProjection
 			cmn.ErrorLog(err)
 			return err
 		}
+		cache.EnrichedProjections = append(cache.EnrichedProjections, ep)
+	}
+
+	return nil
+}
+
+func (cache *ProjectionsCache) RefreshStatsByArray(projections []api.JsonEnrichedProjections) {
+	for p := range projections {
+		ep := projections[p]
 		fresh := false
-		stats.Total++
+		cache.Stats.Total++
 		switch api.ConfidenceToInt(ep.Confidence) {
 		case cmn.CONST_CONFIDENCE_LOW:
-			stats.Low++
+			cache.Stats.Low++
 		case cmn.CONST_CONFIDENCE_BLAH:
-			stats.Blah++
+			cache.Stats.Blah++
 		case cmn.CONST_CONFIDENCE_NONE:
-			stats.None++
+			cache.Stats.None++
 		case cmn.CONST_CONFIDENCE_MEDIUM:
-			stats.Medium++
+			cache.Stats.Medium++
 		case cmn.CONST_CONFIDENCE_HIGH:
-			stats.High++
+			cache.Stats.High++
 		}
 		lastUpdate := cmn.DateStringToTime(ep.Date)
 		daysSince := time.Now().Sub(lastUpdate).Hours() / 24
 		if daysSince < 90 {
 			fresh = true
-			stats.Fresh++
+			cache.Stats.Fresh++
 		}
 
 		if ep.PercentPortfolio > 0 {
-			*positionsProjections = append(*positionsProjections, ep)
 			if !fresh {
-				stats.PW1 = false
+				cache.Stats.PW1 = false
 			}
 		} else if ep.Watch {
-			*watchProjections = append(*watchProjections, ep)
 			if !fresh {
-				stats.PW1 = false
+				cache.Stats.PW1 = false
 			}
-		} else {
-			*researchProjections = append(*researchProjections, ep)
 		}
 	}
+}
 
-	sort.Slice(*positionsProjections, func(i, j int) bool {
-		return (*positionsProjections)[i].PercentPortfolio > (*positionsProjections)[j].PercentPortfolio
-	})
+func (cache *ProjectionsCache) RefreshStats() {
+	cache.Stats = api.JsonProjectionsStats{}
+	cache.RefreshStatsByArray(cache.PositionsProjections)
+	cache.RefreshStatsByArray(cache.WatchProjections)
+	cache.RefreshStatsByArray(cache.ResearchProjections)
 
-	sort.Slice(*watchProjections, func(i, j int) bool {
-		if api.ConfidenceToInt((*watchProjections)[i].Confidence) == api.ConfidenceToInt((*watchProjections)[j].Confidence) {
-			return (*watchProjections)[i].CAGR5yr > (*watchProjections)[j].CAGR5yr
+	// Last one: For PW1 to be true, we need positions + watch + 1 to be fresh
+	if cache.Stats.PW1 && cache.Stats.Fresh <= (len(cache.PositionsProjections)+len(cache.WatchProjections)) {
+		cache.Stats.PW1 = false
+	}
+}
+
+func (cache *ProjectionsCache) Sift() error {
+	// Clear and then Refresh
+	cache.PositionsProjections = cache.PositionsProjections[:0]
+	cache.WatchProjections = cache.WatchProjections[:0]
+	cache.ResearchProjections = cache.ResearchProjections[:0]
+
+	for p := range cache.EnrichedProjections {
+		ep := cache.EnrichedProjections[p]
+		if ep.PercentPortfolio > 0 {
+			cache.PositionsProjections = append(cache.PositionsProjections, ep)
+		} else if ep.Watch {
+			cache.WatchProjections = append(cache.WatchProjections, ep)
+		} else {
+			cache.ResearchProjections = append(cache.ResearchProjections, ep)
 		}
-		return api.ConfidenceToInt((*watchProjections)[i].Confidence) > api.ConfidenceToInt((*watchProjections)[j].Confidence)
-	})
-
-	sort.Slice(*researchProjections, func(i, j int) bool {
-		if api.ConfidenceToInt((*researchProjections)[i].Confidence) == api.ConfidenceToInt((*researchProjections)[j].Confidence) {
-			return (*researchProjections)[i].CAGR5yr > (*researchProjections)[j].CAGR5yr
-		}
-		return api.ConfidenceToInt((*researchProjections)[i].Confidence) > api.ConfidenceToInt((*researchProjections)[j].Confidence)
-	})
-
-	if stats.PW1 && stats.Fresh <= (len(*positionsProjections)+len(*watchProjections)) {
-		stats.PW1 = false
 	}
 
 	return nil
+}
+
+func (cache *ProjectionsCache) Sort() {
+	sort.Slice(cache.PositionsProjections, func(i, j int) bool {
+		return (cache.PositionsProjections)[i].PercentPortfolio > (cache.PositionsProjections)[j].PercentPortfolio
+	})
+
+	sort.Slice(cache.WatchProjections, func(i, j int) bool {
+		if api.ConfidenceToInt((cache.WatchProjections)[i].Confidence) == api.ConfidenceToInt((cache.WatchProjections)[j].Confidence) {
+			return (cache.WatchProjections)[i].CAGR5yr > (cache.WatchProjections)[j].CAGR5yr
+		}
+		return api.ConfidenceToInt((cache.WatchProjections)[i].Confidence) > api.ConfidenceToInt((cache.WatchProjections)[j].Confidence)
+	})
+
+	sort.Slice(cache.ResearchProjections, func(i, j int) bool {
+		if api.ConfidenceToInt((cache.ResearchProjections)[i].Confidence) == api.ConfidenceToInt((cache.ResearchProjections)[j].Confidence) {
+			return (cache.ResearchProjections)[i].CAGR5yr > (cache.ResearchProjections)[j].CAGR5yr
+		}
+		return api.ConfidenceToInt((cache.ResearchProjections)[i].Confidence) > api.ConfidenceToInt((cache.ResearchProjections)[j].Confidence)
+	})
+}
+
+func (cache *ProjectionsCache) Init() error {
+	err := cache.CacheEnrichedProjections()
+	if err != nil {
+		return err
+	}
+	cache.Sift()
+	cache.RefreshStats()
+	cache.Sort()
+	return nil
+}
+
+func EnrichedProjections(msg string, cache *[]api.JsonEnrichedProjections, err error) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cmn.Enter(msg, w, r)
+		if err != nil {
+			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+			return
+		}
+		json.NewEncoder(w).Encode(cache)
+		cmn.Exit(msg, cache)
+	}
+}
+
+func ProjectionsStats(msg string, cache api.JsonProjectionsStats, err error) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cmn.Enter(msg, w, r)
+		if err != nil {
+			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+			return
+		}
+		json.NewEncoder(w).Encode(&cache)
+		cmn.Exit(msg, &cache)
+	}
 }
 
 func CacheEnrichedProjectionsTotal(positionsProjectionsTotal *[]api.JsonEnrichedProjections, positionsProjections []api.JsonEnrichedProjections) {
@@ -129,23 +182,64 @@ func CacheEnrichedProjectionsTotal(positionsProjectionsTotal *[]api.JsonEnriched
 	*positionsProjectionsTotal = append(*positionsProjectionsTotal, ret)
 }
 
+func ProjectionsUpdate(cache *ProjectionsCache, err error) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cmn.Enter("Cache-ProjectionsUpdate", w, r)
+		if err != nil {
+			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+			return
+		}
+
+		params := mux.Vars(r)
+		id, err := strconv.Atoi(params["id"])
+		if err != nil {
+			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+			return
+		}
+
+		var ret api.JsonEnrichedProjections
+		err = api.EnrichedProjectionsByID(id, &ret)
+		if err != nil {
+			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+			return
+		}
+
+		found := false
+		for i := range cache.EnrichedProjections {
+			ep := cache.EnrichedProjections[i]
+			if ep.ID == id {
+				cache.EnrichedProjections[i] = ret
+				found = true
+			}
+		}
+
+		if !found {
+			cache.EnrichedProjections = append(cache.EnrichedProjections, ret)
+		}
+
+		cache.Sift()
+		cache.RefreshStats()
+		cache.Sort()
+
+		cmn.Exit("Cache-ProjectionsUpdate", cache)
+	}
+}
+
 func main() {
 	// Build up caches
-	var positionsProjections []api.JsonEnrichedProjections
-	var watchProjections []api.JsonEnrichedProjections
-	var researchProjections []api.JsonEnrichedProjections
-	var stats api.JsonProjectionsStats
-	err := CacheEnrichedProjections(&positionsProjections, &watchProjections, &researchProjections, &stats)
+	var cache ProjectionsCache
+	err := cache.Init()
 
 	var positionsProjectionsTotal []api.JsonEnrichedProjections
-	CacheEnrichedProjectionsTotal(&positionsProjectionsTotal, positionsProjections)
+	CacheEnrichedProjectionsTotal(&positionsProjectionsTotal, cache.PositionsProjections)
 
 	log.Println("Listening on http://localhost:8084/blue-lion/cache")
 	router := mux.NewRouter().StrictSlash(true)
-	router.HandleFunc("/blue-lion/cache/enriched-projections-positions", EnrichedProjections("Cache-EnrichedProjectionsPositions", positionsProjections, err)).Methods("GET")
-	router.HandleFunc("/blue-lion/cache/enriched-projections-positions-total", EnrichedProjections("Cache-EnrichedProjectionsPositionsTotal", positionsProjectionsTotal, err)).Methods("GET")
-	router.HandleFunc("/blue-lion/cache/enriched-projections-watch", EnrichedProjections("Cache-EnrichedProjectionsWatch", watchProjections, err)).Methods("GET")
-	router.HandleFunc("/blue-lion/cache/enriched-projections-research", EnrichedProjections("Cache-EnrichedProjectionsResearch", researchProjections, err)).Methods("GET")
-	router.HandleFunc("/blue-lion/cache/projections-stats", ProjectionsStats("Cache-ProjectionsStats", stats, err)).Methods("GET")
+	router.HandleFunc("/blue-lion/cache/enriched-projections-positions", EnrichedProjections("Cache-EnrichedProjectionsPositions", &cache.PositionsProjections, err)).Methods("GET")
+	router.HandleFunc("/blue-lion/cache/enriched-projections-positions-total", EnrichedProjections("Cache-EnrichedProjectionsPositionsTotal", &positionsProjectionsTotal, err)).Methods("GET")
+	router.HandleFunc("/blue-lion/cache/enriched-projections-watch", EnrichedProjections("Cache-EnrichedProjectionsWatch", &cache.WatchProjections, err)).Methods("GET")
+	router.HandleFunc("/blue-lion/cache/enriched-projections-research", EnrichedProjections("Cache-EnrichedProjectionsResearch", &cache.ResearchProjections, err)).Methods("GET")
+	router.HandleFunc("/blue-lion/cache/projections-stats", ProjectionsStats("Cache-ProjectionsStats", cache.Stats, err)).Methods("GET")
+	router.HandleFunc("/blue-lion/cache/projections-update/{id}", ProjectionsUpdate(&cache, err)).Methods("GET")
 	log.Fatal(http.ListenAndServe(":8084", router))
 }

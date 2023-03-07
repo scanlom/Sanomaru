@@ -206,6 +206,7 @@ func Projections(w http.ResponseWriter, r *http.Request) {
 func ProjectionsByID(w http.ResponseWriter, r *http.Request) {
 	var ret api.JsonProjections
 	RestHandlePut(w, r, "Write-ProjectionsByID", &ret, ret, "projections")
+	api.ProjectionsUpdateByID(ret.ID)
 }
 
 func PortfoliosByID(w http.ResponseWriter, r *http.Request) {
