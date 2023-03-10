@@ -14,11 +14,12 @@ import (
 )
 
 type ProjectionsCache struct {
-	EnrichedProjections  []api.JsonEnrichedProjections
-	PositionsProjections []api.JsonEnrichedProjections
-	WatchProjections     []api.JsonEnrichedProjections
-	ResearchProjections  []api.JsonEnrichedProjections
-	Stats                api.JsonProjectionsStats
+	EnrichedProjections       []api.JsonEnrichedProjections
+	PositionsProjections      []api.JsonEnrichedProjections
+	PositionsProjectionsTotal []api.JsonEnrichedProjections
+	WatchProjections          []api.JsonEnrichedProjections
+	ResearchProjections       []api.JsonEnrichedProjections
+	Stats                     api.JsonProjectionsStats
 }
 
 func (cache *ProjectionsCache) CacheEnrichedProjections() error {
@@ -89,6 +90,25 @@ func (cache *ProjectionsCache) RefreshStats() {
 	}
 }
 
+func (cache *ProjectionsCache) RefreshTotal() {
+	var ret api.JsonEnrichedProjections
+	ret.Ticker = "Total"
+	for i := range cache.PositionsProjections {
+		ep := cache.PositionsProjections[i]
+		ret.Growth += ep.Growth * ep.PercentPortfolio
+		ret.DivPlusGrowth += ep.DivPlusGrowth * ep.PercentPortfolio
+		ret.EPSYield += ep.EPSYield * ep.PercentPortfolio
+		ret.DPSYield += ep.DPSYield * ep.PercentPortfolio
+		ret.CAGR5yr += ep.CAGR5yr * ep.PercentPortfolio
+		ret.CAGR10yr += ep.CAGR10yr * ep.PercentPortfolio
+		ret.CROE5yr += ep.CROE5yr * ep.PercentPortfolio
+		ret.CROE10yr += ep.CROE10yr * ep.PercentPortfolio
+		ret.PercentPortfolio += ep.PercentPortfolio
+	}
+	cache.PositionsProjectionsTotal = cache.PositionsProjectionsTotal[:0]
+	cache.PositionsProjectionsTotal = append(cache.PositionsProjectionsTotal, ret)
+}
+
 func (cache *ProjectionsCache) Sift() error {
 	// Clear and then Refresh
 	cache.PositionsProjections = cache.PositionsProjections[:0]
@@ -135,8 +155,9 @@ func (cache *ProjectionsCache) Init() error {
 		return err
 	}
 	cache.Sift()
-	cache.RefreshStats()
 	cache.Sort()
+	cache.RefreshStats()
+	cache.RefreshTotal()
 	return nil
 }
 
@@ -152,34 +173,16 @@ func EnrichedProjections(msg string, cache *[]api.JsonEnrichedProjections, err e
 	}
 }
 
-func ProjectionsStats(msg string, cache api.JsonProjectionsStats, err error) http.HandlerFunc {
+func ProjectionsStats(msg string, cache *api.JsonProjectionsStats, err error) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cmn.Enter(msg, w, r)
 		if err != nil {
 			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 			return
 		}
-		json.NewEncoder(w).Encode(&cache)
-		cmn.Exit(msg, &cache)
+		json.NewEncoder(w).Encode(cache)
+		cmn.Exit(msg, cache)
 	}
-}
-
-func CacheEnrichedProjectionsTotal(positionsProjectionsTotal *[]api.JsonEnrichedProjections, positionsProjections []api.JsonEnrichedProjections) {
-	var ret api.JsonEnrichedProjections
-	ret.Ticker = "Total"
-	for i := range positionsProjections {
-		ep := positionsProjections[i]
-		ret.Growth += ep.Growth * ep.PercentPortfolio
-		ret.DivPlusGrowth += ep.DivPlusGrowth * ep.PercentPortfolio
-		ret.EPSYield += ep.EPSYield * ep.PercentPortfolio
-		ret.DPSYield += ep.DPSYield * ep.PercentPortfolio
-		ret.CAGR5yr += ep.CAGR5yr * ep.PercentPortfolio
-		ret.CAGR10yr += ep.CAGR10yr * ep.PercentPortfolio
-		ret.CROE5yr += ep.CROE5yr * ep.PercentPortfolio
-		ret.CROE10yr += ep.CROE10yr * ep.PercentPortfolio
-		ret.PercentPortfolio += ep.PercentPortfolio
-	}
-	*positionsProjectionsTotal = append(*positionsProjectionsTotal, ret)
 }
 
 func ProjectionsUpdate(cache *ProjectionsCache, err error) http.HandlerFunc {
@@ -218,8 +221,9 @@ func ProjectionsUpdate(cache *ProjectionsCache, err error) http.HandlerFunc {
 		}
 
 		cache.Sift()
-		cache.RefreshStats()
 		cache.Sort()
+		cache.RefreshStats()
+		cache.RefreshTotal()
 
 		cmn.Exit("Cache-ProjectionsUpdate", cache)
 	}
@@ -230,16 +234,13 @@ func main() {
 	var cache ProjectionsCache
 	err := cache.Init()
 
-	var positionsProjectionsTotal []api.JsonEnrichedProjections
-	CacheEnrichedProjectionsTotal(&positionsProjectionsTotal, cache.PositionsProjections)
-
 	log.Println("Listening on http://localhost:8084/blue-lion/cache")
 	router := mux.NewRouter().StrictSlash(true)
 	router.HandleFunc("/blue-lion/cache/enriched-projections-positions", EnrichedProjections("Cache-EnrichedProjectionsPositions", &cache.PositionsProjections, err)).Methods("GET")
-	router.HandleFunc("/blue-lion/cache/enriched-projections-positions-total", EnrichedProjections("Cache-EnrichedProjectionsPositionsTotal", &positionsProjectionsTotal, err)).Methods("GET")
+	router.HandleFunc("/blue-lion/cache/enriched-projections-positions-total", EnrichedProjections("Cache-EnrichedProjectionsPositionsTotal", &cache.PositionsProjectionsTotal, err)).Methods("GET")
 	router.HandleFunc("/blue-lion/cache/enriched-projections-watch", EnrichedProjections("Cache-EnrichedProjectionsWatch", &cache.WatchProjections, err)).Methods("GET")
 	router.HandleFunc("/blue-lion/cache/enriched-projections-research", EnrichedProjections("Cache-EnrichedProjectionsResearch", &cache.ResearchProjections, err)).Methods("GET")
-	router.HandleFunc("/blue-lion/cache/projections-stats", ProjectionsStats("Cache-ProjectionsStats", cache.Stats, err)).Methods("GET")
+	router.HandleFunc("/blue-lion/cache/projections-stats", ProjectionsStats("Cache-ProjectionsStats", &cache.Stats, err)).Methods("GET")
 	router.HandleFunc("/blue-lion/cache/projections-update/{id}", ProjectionsUpdate(&cache, err)).Methods("GET")
 	log.Fatal(http.ListenAndServe(":8084", router))
 }

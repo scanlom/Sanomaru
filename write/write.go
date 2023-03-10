@@ -201,6 +201,25 @@ func TransactionsByID(w http.ResponseWriter, r *http.Request) {
 func Projections(w http.ResponseWriter, r *http.Request) {
 	var ret api.JsonProjections
 	RestHandlePost(w, r, "Write-Projections", &ret, ret, "projections")
+
+	// Reload the projection so ID is populated correctly (unfortunately Postgres driver does not handle
+	// getting this without simply doing a reselect)
+	var refData api.JsonRefData
+	err := api.RefDataByID(ret.RefDataID, &refData)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+	err = api.ProjectionsBySymbol(refData.Symbol, &ret)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+	err = api.ProjectionsUpdateByID(ret.ID)
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
 }
 
 func ProjectionsByID(w http.ResponseWriter, r *http.Request) {
@@ -475,6 +494,9 @@ func EnrichedProjectionsJournal(w http.ResponseWriter, r *http.Request) {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
+
+	// Notify out that a projection has been updated
+	api.ProjectionsUpdateByID(ret.ProjectionsID)
 
 	json.NewEncoder(w).Encode(&ret)
 	cmn.Exit("Write-EnrichedProjectionsJournal", &ret)
