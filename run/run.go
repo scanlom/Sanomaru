@@ -30,6 +30,7 @@ func JobValuationCutInternal() (error) {
 		/*"6670.T"*/ 2451: CONST_FX_JPY,
 		/*"MRO.L"*/ 97: CONST_FX_GBP,
 		/*"BATS.L"*/ 3280: CONST_FX_GBP,
+		/*"DWL.L"*/ 3737: CONST_FX_GBP,
 		/*"U11.SI"*/ 3126: CONST_FX_SGD,
 	}
 
@@ -235,7 +236,8 @@ func ExecuteBookTransaction(w http.ResponseWriter, r *http.Request) {
 
 		// Did we sell down to zero? Float qty's (VNE) caught us out in our python script, so we compare with a fudge
 		// MSTODO: Handle CONST_PRICING_TYPE_BY_VALUE positions sold down to zero
-		if position.PricingType == cmn.CONST_PRICING_TYPE_BY_PRICE && position.Quantity < cmn.CONST_FUDGE {
+		if (position.PricingType == cmn.CONST_PRICING_TYPE_BY_PRICE && position.Quantity - ret.Quantity < cmn.CONST_FUDGE) ||
+			(position.PricingType == cmn.CONST_PRICING_TYPE_BY_VALUE && position.Value - ret.Value < cmn.CONST_FUDGE) {
 			position.CostBasis = 0.0
 			position.Quantity = 0.0
 			position.Value = 0.0
@@ -289,6 +291,13 @@ func ExecuteBookTransaction(w http.ResponseWriter, r *http.Request) {
 		}
 	case cmn.CONST_TXN_TYPE_DI:
 		log.Println("Run-ExecuteBookTransaction: Handling CONST_TXN_TYPE_DI")
+		portfolio.Cash += ret.Value
+		portfolio.Debt += ret.Value
+		portfolio.ValueTotalCapital += ret.Value
+		portfolio.DivisorTotalCapital = portfolio.IndexTotalCapital / portfolio.ValueTotalCapital
+
+		// There should never be a DI on a sub portfolio
+		// MSTODO: Throw error
 	case cmn.CONST_TXN_TYPE_INT:
 		log.Println("Run-ExecuteBookTransaction: Handling CONST_TXN_TYPE_INT")
 		portfolio.Cash += ret.Value
