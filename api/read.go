@@ -217,6 +217,13 @@ func PositionsByID(id int, ret *JsonPosition) error {
 	)
 }
 
+func PositionReturnsByID(id int, ret *JsonReturns) error {
+	return RestGetByUrl("PositionReturnsByID",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/position-returns/%d", id),
+		ret,
+	)
+}
+
 func EnrichedPositionsBySymbolPortfolioID(symbol string, portfolioId int, ret *JsonEnrichedPosition) error {
 	return RestGetByUrl("EnrichedPositionsBySymbolPortfolioID",
 		fmt.Sprintf("http://localhost:8081/blue-lion/read/enriched-positions?symbol=%s&portfolioId=%d", symbol, portfolioId),

@@ -1417,11 +1417,12 @@ func CalculateReturn(table string, idCol string, id int, index float64, date str
 	_ = cmn.DbGet(&start, fmt.Sprintf(query, table, idCol, id, table, idCol, id, date, interval))
 	if start > 0 {
 		ret = cmn.Round(math.Pow(index/start, 1/years)-1, 0.0001)
+		log.Printf("CalculateReturn: start: %f, ret: %f", start, ret)
 	}
 	return ret
 }
 
-func EnrichReturns(table string, idCol string, id int, name string, value float64, index float64, tci float64, divs float64, date string) (api.JsonReturns) {
+func EnrichReturns(table string, idCol string, id int, name string, value float64, index float64, tci float64, divs float64, date string) api.JsonReturns {
 	r := api.JsonReturns{}
 	r.ID = id
 	r.Name = name
@@ -1436,7 +1437,7 @@ func EnrichReturns(table string, idCol string, id int, name string, value float6
 	return r
 }
 
-func EnrichYTDPortfolioReturns(r *api.JsonReturns, value float64, index float64, tci float64, date string) (error) {
+func EnrichYTDPortfolioReturns(r *api.JsonReturns, value float64, index float64, tci float64, date string) error {
 	yearStartDate := ""
 	dateParsed, err := time.Parse("2006-01-02", date)
 	if err != nil {
@@ -1451,7 +1452,8 @@ func EnrichYTDPortfolioReturns(r *api.JsonReturns, value float64, index float64,
 	physd := api.JsonPortfolioHistory{}
 	err = api.PortfoliosHistoryPortfolioIDDate(r.ID, yearStartDate, &physd)
 	if err != nil {
-		return err
+		// If there was no position on the first of the year, that's ok, returns are just zero
+		return nil
 	}
 
 	if physd.Index > 0 {
@@ -1461,7 +1463,7 @@ func EnrichYTDPortfolioReturns(r *api.JsonReturns, value float64, index float64,
 	return nil
 }
 
-func EnrichYTDPositionReturns(r *api.JsonReturns, value float64, index float64, tci float64, divs float64, date string) (error) {
+func EnrichYTDPositionReturns(r *api.JsonReturns, value float64, index float64, tci float64, divs float64, date string) error {
 	yearStartDate := ""
 	dateParsed, err := time.Parse("2006-01-02", date)
 	if err != nil {
@@ -1476,7 +1478,8 @@ func EnrichYTDPositionReturns(r *api.JsonReturns, value float64, index float64, 
 	physd := api.JsonPositionHistory{}
 	err = api.PositionsHistoryByPositionIDDate(r.ID, yearStartDate, &physd)
 	if err != nil {
-		return err
+		// If there was no position on the first of the year, that's ok, returns are just zero
+		return nil
 	}
 
 	if physd.Index > 0 {
@@ -1503,7 +1506,7 @@ func PortfolioReturnsByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ret := EnrichReturns("portfolios_history", "portfolio_id", portfolio.ID, portfolio.Name, portfolio.Value, portfolio.Index, portfolio.TotalCashInfusion, 
+	ret := EnrichReturns("portfolios_history", "portfolio_id", portfolio.ID, portfolio.Name, portfolio.Value, portfolio.Index, portfolio.TotalCashInfusion,
 		0, time.Now().Format("2006-01-02"))
 	err = EnrichYTDPortfolioReturns(&ret, portfolio.Value, portfolio.Index, portfolio.TotalCashInfusion, time.Now().Format("2006-01-02"))
 	if err != nil {
@@ -1526,7 +1529,7 @@ func PortfolioReturns(w http.ResponseWriter, r *http.Request) {
 
 	ret := []api.JsonReturns{}
 	for i := range portfolios {
-		pr := EnrichReturns("portfolios_history", "portfolio_id", portfolios[i].ID, portfolios[i].Name, portfolios[i].Value, portfolios[i].Index, 
+		pr := EnrichReturns("portfolios_history", "portfolio_id", portfolios[i].ID, portfolios[i].Name, portfolios[i].Value, portfolios[i].Index,
 			portfolios[i].TotalCashInfusion, 0, time.Now().Format("2006-01-02"))
 		err = EnrichYTDPortfolioReturns(&pr, portfolios[i].Value, portfolios[i].Index, portfolios[i].TotalCashInfusion, time.Now().Format("2006-01-02"))
 		if err != nil {
@@ -1563,7 +1566,7 @@ func PortfolioReturnsByDate(w http.ResponseWriter, r *http.Request) {
 	for i := range portfoliosHistory {
 		portfolio := portfoliosHistory[i].JsonPortfolio
 		portfolio.ID = portfoliosHistory[i].PortfolioID
-		pr := EnrichReturns("portfolios_history", "portfolio_id", portfolio.ID, portfolio.Name, portfolio.Value, portfolio.Index, portfolio.TotalCashInfusion, 
+		pr := EnrichReturns("portfolios_history", "portfolio_id", portfolio.ID, portfolio.Name, portfolio.Value, portfolio.Index, portfolio.TotalCashInfusion,
 			0, args.Date)
 		err = EnrichYTDPortfolioReturns(&pr, portfolio.Value, portfolio.Index, portfolio.TotalCashInfusion, args.Date)
 		if err != nil {
@@ -1601,6 +1604,7 @@ func PositionReturnsByID(w http.ResponseWriter, r *http.Request) {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
+
 	json.NewEncoder(w).Encode(&ret)
 	cmn.Exit("Read-PositionReturnsByID", ret)
 }
@@ -1796,35 +1800,55 @@ func EnrichMerger(m api.JsonMerger) (api.JsonEnrichedMerger, error) {
 	}
 	em.Price = md.Last
 
+	closeTime := cmn.DateStringToTime(em.CloseDate)
+	strikeTime := cmn.DateStringToTime(em.AnnounceDate)
+	daysToClose := closeTime.Sub(time.Now()).Hours() / 24
 	fees := 0.005
 	if strings.Contains(em.TargetTicker, ".HK") {
 		fees = (0.0008 + 0.0013) * md.Last // 8 bps commision and 13 bps stamp on each side
 	}
-
-	em.MarketPositiveReturn = cmn.Round((em.DealPrice+em.Dividends-fees)/md.Last-1, 0.0001)
-	em.MarketNetReturn = cmn.Round(
-		((em.DealPrice+em.Dividends-fees-md.Last)*em.Confidence-(md.Last-em.FailPrice-em.Dividends+2*fees)*(1-em.Confidence))/md.Last, 0.0001)
-	closeTime := cmn.DateStringToTime(em.CloseDate)
-	daysToClose := closeTime.Sub(time.Now()).Hours() / 24
-	annualizeMultiple := 365 / daysToClose
-	em.MarketPositiveReturnAnnualized = cmn.Round(annualizeMultiple*em.MarketPositiveReturn, 0.0001)
-	em.MarketNetReturnAnnualized = cmn.Round(annualizeMultiple*em.MarketNetReturn, 0.0001)
+	if em.BreakPrice > 0 {
+		em.Status = "B"
+		if em.StrikePrice > 0 {
+			em.StrikeReturn = cmn.Round((em.BreakPrice+em.Cash-fees)/em.StrikePrice-1, 0.0001)
+			daysFromStrike := closeTime.Sub(strikeTime).Hours() / 24
+			em.StrikeReturnAnnualized = cmn.Round((365 / daysFromStrike)*em.StrikeReturn, 0.0001)
+		}
+	} else if daysToClose < 0 {
+		em.Status = "C"
+		if em.StrikePrice > 0 {
+			em.StrikeReturn = cmn.Round((em.DealPrice+em.Cash-fees)/em.StrikePrice-1, 0.0001)
+			daysFromStrike := closeTime.Sub(strikeTime).Hours() / 24
+			em.StrikeReturnAnnualized = cmn.Round((365 / daysFromStrike)*em.StrikeReturn, 0.0001)
+		}
+	} else {
+		em.Status = "O"
+		if em.StrikePrice > 0 {
+			em.StrikeReturn = cmn.Round((md.Last+em.Cash-fees)/em.StrikePrice-1, 0.0001)
+			daysFromStrike := time.Now().Sub(strikeTime).Hours() / 24
+			em.StrikeReturnAnnualized = cmn.Round((365 / daysFromStrike)*em.StrikeReturn, 0.0001)
+		}
+		em.MarketPositiveReturn = cmn.Round((em.DealPrice+em.Dividends-fees)/md.Last-1, 0.0001)
+		em.MarketNetReturn = cmn.Round(
+			((em.DealPrice+em.Dividends-fees-md.Last)*em.Confidence-(md.Last-em.FailPrice-em.Dividends+2*fees)*(1-em.Confidence))/md.Last, 0.0001)
+		annualizeMultiple := 365 / daysToClose
+		em.MarketPositiveReturnAnnualized = cmn.Round(annualizeMultiple*em.MarketPositiveReturn, 0.0001)
+		em.MarketNetReturnAnnualized = cmn.Round(annualizeMultiple*em.MarketNetReturn, 0.0001)
+	}
 
 	var position api.JsonEnrichedPosition
 	err = api.EnrichedPositionsBySymbolPortfolioID(em.TargetTicker, cmn.CONST_PORTFOLIO_RISK_ARB, &position)
 	// Don't pass the error up, it's ok if this isn't a position, we just populate zero
 	if err == nil {
 		em.PercentPortfolio = position.PercentPortfolio
+		em.PositionReturn = cmn.Round(position.Index/100.0-1, 0.0001)
 	}
 
-	if em.PercentPortfolio > 0 {
-		em.Status = "P"
-	} else if em.BreakPrice > 0 {
-		em.Status = "B"
-	} else if daysToClose < 0 {
-		em.Status = "C"
-	} else {
-		em.Status = "O"
+	var returns api.JsonReturns
+	err = api.PositionReturnsByID(position.ID, &returns)
+	// Don't pass the error up, it's ok if this isn't a position, we just populate zero
+	if err == nil {
+		em.ProfitLifetime = returns.ProfitLifetime
 	}
 
 	return em, nil

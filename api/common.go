@@ -257,12 +257,14 @@ type JsonMerger struct {
 	DealPrice         float64 `json:"dealPrice" db:"deal_price"`
 	FailPrice         float64 `json:"failPrice" db:"fail_price"`
 	BreakPrice        float64 `json:"breakPrice" db:"break_price"`
+	StrikePrice       float64 `json:"strikePrice" db:"strike_price"`
 	AnnounceDate      string  `json:"announceDate" db:"announce_date"`
 	MeetingDate       string  `json:"meetingDate" db:"meeting_date"`
 	CloseDate         string  `json:"closeDate" db:"close_date"`
 	BreakDate         string  `json:"breakDate" db:"break_date"`
 	Confidence        float64 `json:"confidence" db:"confidence"`
 	Dividends         float64 `json:"dividends" db:"dividends"`
+	Cash              float64 `json:"cash" db:"cash"`
 }
 
 type JsonEnrichedMerger struct {
@@ -276,8 +278,13 @@ type JsonEnrichedMerger struct {
 	MarketNetReturn                float64 `json:"marketNetReturn" db:"market_net_return"`
 	MarketPositiveReturnAnnualized float64 `json:"marketPositiveReturnAnnualized" db:"market_positive_return_annualized"`
 	MarketNetReturnAnnualized      float64 `json:"marketNetReturnAnnualized" db:"market_net_return_annualized"`
+	StrikeReturn                   float64 `json:"strikeReturn" db:"strike_return"`
+	StrikeReturnAnnualized         float64 `json:"strikeReturnAnnualized" db:"strike_return_annualized"`
 	PercentPortfolio               float64 `json:"percentPortfolio" db:"percent_portfolio"`
 	Status                         string  `json:"status" db:"status"`
+	// Returns
+	PositionReturn float64 `json:"positionReturn" db:"position_return"`
+	ProfitLifetime float64 `json:"profitLifetime" db:"profit_lifetime"`
 }
 
 type JsonEnrichedMergerJournal struct {
