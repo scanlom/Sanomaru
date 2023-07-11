@@ -59,6 +59,7 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/portfolios-history", PortfoliosHistoryByPortfolioIDDate).Queries("portfolioId", "", "date", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/portfolios-history", PortfoliosHistoryByDate).Queries("date", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/portfolios-history-max-date", PortfoliosHistoryMaxDate).Methods("GET")
+	router.HandleFunc("/blue-lion/read/portfolios-history-max-index", PortfoliosHistoryMaxIndexByPortfolioID).Queries("portfolioId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/positions/{id}", PositionsByID).Methods("GET")
 	router.HandleFunc("/blue-lion/read/positions", PositionsBySymbolPortfolioID).Queries("symbol", "", "portfolioId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/positions", Positions).Methods("GET")
@@ -1227,7 +1228,9 @@ func PortfoliosHistoryByDate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ret := []api.JsonPortfolioHistory{}
-	err = db.Select(&ret, api.JsonToSelect(api.JsonPortfolioHistory{}, fmt.Sprintf("portfolios_history WHERE date='%s'", args.Date), ""))
+	err = db.Select(&ret, api.JsonToSelect(api.JsonPortfolioHistory{},
+		fmt.Sprintf("portfolios_history WHERE date=(select max(date) from portfolios_history where date <= '%s' and value > 0)", args.Date),
+		""))
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
@@ -1259,7 +1262,9 @@ func PortfoliosHistoryByPortfolioIDDate(w http.ResponseWriter, r *http.Request) 
 	}
 
 	ret := api.JsonPortfolioHistory{}
-	err = db.Get(&ret, api.JsonToSelect(api.JsonPortfolioHistory{}, fmt.Sprintf("portfolios_history WHERE portfolio_id=%d and date='%s'", args.PortfolioID, args.Date), ""))
+	err = db.Get(&ret, api.JsonToSelect(api.JsonPortfolioHistory{},
+		fmt.Sprintf("portfolios_history WHERE portfolio_id=%d and date=(select max(date) from portfolios_history where date <= '%s' and value > 0)", args.PortfolioID, args.Date),
+		""))
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
@@ -1267,6 +1272,36 @@ func PortfoliosHistoryByPortfolioIDDate(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(&ret)
 
 	cmn.Exit("Read-PortfoliosHistoryByPortfolioIDDate", ret)
+}
+
+func PortfoliosHistoryMaxIndexByPortfolioID(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-PortfoliosHistoryMaxIndexByPortfolioID", w, r)
+
+	args := new(cmn.RestPortfolioIDInput)
+	decoder := schema.NewDecoder()
+	err := decoder.Decode(args, r.URL.Query())
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		return
+	}
+
+	db, err := cmn.DbConnect()
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	ret := api.JsonPortfolioHistory{}
+	err = db.Get(&ret, api.JsonToSelect(api.JsonPortfolioHistory{},
+		fmt.Sprintf("portfolios_history WHERE portfolio_id=%d and index=(select max(index) from portfolios_history where portfolio_id=%d)", args.PortfolioID, args.PortfolioID),
+		""))
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(&ret)
+
+	cmn.Exit("Read-PortfoliosHistoryMaxIndexByPortfolioID", ret)
 }
 
 func PositionsHistoryFirst(w http.ResponseWriter, r *http.Request) {
@@ -1309,7 +1344,9 @@ func PositionsHistoryByPortfolioIDDate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ret := []api.JsonPositionHistory{}
-	err = db.Select(&ret, api.JsonToSelect(api.JsonPositionHistory{}, fmt.Sprintf("positions_history WHERE portfolio_id=%d and date='%s'", args.PortfolioID, args.Date), ""))
+	err = db.Select(&ret, api.JsonToSelect(api.JsonPositionHistory{},
+		fmt.Sprintf("positions_history WHERE portfolio_id=%d and date=(select max(date) from positions_history where date <= '%s')", args.PortfolioID, args.Date),
+		""))
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
@@ -1337,7 +1374,9 @@ func PositionsHistoryByPositionIDDate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ret := api.JsonPositionHistory{}
-	err = db.Get(&ret, api.JsonToSelect(api.JsonPositionHistory{}, fmt.Sprintf("positions_history WHERE position_id=%d and date='%s'", args.PositionID, args.Date), ""))
+	err = db.Get(&ret, api.JsonToSelect(api.JsonPositionHistory{},
+		fmt.Sprintf("positions_history WHERE position_id=%d and date=(select max(date) from positions_history where date <= '%s')", args.PositionID, args.Date),
+		""))
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
@@ -1812,21 +1851,21 @@ func EnrichMerger(m api.JsonMerger) (api.JsonEnrichedMerger, error) {
 		if em.StrikePrice > 0 {
 			em.StrikeReturn = cmn.Round((em.BreakPrice+em.Cash-fees)/em.StrikePrice-1, 0.0001)
 			daysFromStrike := closeTime.Sub(strikeTime).Hours() / 24
-			em.StrikeReturnAnnualized = cmn.Round((365 / daysFromStrike)*em.StrikeReturn, 0.0001)
+			em.StrikeReturnAnnualized = cmn.Round((365/daysFromStrike)*em.StrikeReturn, 0.0001)
 		}
 	} else if daysToClose < 0 {
 		em.Status = "C"
 		if em.StrikePrice > 0 {
 			em.StrikeReturn = cmn.Round((em.DealPrice+em.Cash-fees)/em.StrikePrice-1, 0.0001)
 			daysFromStrike := closeTime.Sub(strikeTime).Hours() / 24
-			em.StrikeReturnAnnualized = cmn.Round((365 / daysFromStrike)*em.StrikeReturn, 0.0001)
+			em.StrikeReturnAnnualized = cmn.Round((365/daysFromStrike)*em.StrikeReturn, 0.0001)
 		}
 	} else {
 		em.Status = "O"
 		if em.StrikePrice > 0 {
 			em.StrikeReturn = cmn.Round((md.Last+em.Cash-fees)/em.StrikePrice-1, 0.0001)
 			daysFromStrike := time.Now().Sub(strikeTime).Hours() / 24
-			em.StrikeReturnAnnualized = cmn.Round((365 / daysFromStrike)*em.StrikeReturn, 0.0001)
+			em.StrikeReturnAnnualized = cmn.Round((365/daysFromStrike)*em.StrikeReturn, 0.0001)
 		}
 		em.MarketPositiveReturn = cmn.Round((em.DealPrice+em.Dividends-fees)/md.Last-1, 0.0001)
 		em.MarketNetReturn = cmn.Round(
