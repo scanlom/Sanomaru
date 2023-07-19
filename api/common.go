@@ -13,6 +13,15 @@ type JsonFloat64Value struct {
 	Value float64 `json:"value"`
 }
 
+type JsonID struct {
+	ID int `json:"id" db:"id"`
+}
+
+type JsonTableID struct {
+	Table string `json:"table"`
+	ID    int    `json:"id"`
+}
+
 type JsonRefData struct {
 	ID                 int    `json:"id" db:"id"`
 	Symbol             string `json:"symbol" db:"symbol"`

@@ -2,6 +2,7 @@ package cmn
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -9,10 +10,12 @@ import (
 	"math"
 	"net/http"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
 )
 
 const CONST_PRICING_TYPE_BY_PRICE = 1
@@ -101,7 +104,7 @@ type RestPortfolioIDDateInput struct {
 
 type RestPositionIDDateInput struct {
 	PositionID int    `schema:"positionId"`
-	Date        string `schema:"date"`
+	Date       string `schema:"date"`
 }
 
 type RestRefDataIDDateInput struct {
@@ -114,6 +117,8 @@ type RestStringOutput struct {
 }
 
 var db *sqlx.DB
+var cache *redis.Client
+var ctx context.Context
 
 func Enter(name string, w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s: Called...", name)
@@ -144,6 +149,99 @@ func ErrorLog(err error) {
 	function, file, line, _ := runtime.Caller(1) // Ignoring the error as we are in an error handler anyway
 	log.Printf("ERROR: File: %s  Function: %s Line: %d", file, runtime.FuncForPC(function).Name(), line)
 	log.Printf("ERROR: %s", err)
+}
+
+func CacheConnect() {
+	if cache != nil {
+		log.Println("CacheConnect: Returned cached connection")
+		return
+	}
+
+	log.Println("CacheConnect: Acquiring connection")
+	cache = redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+
+	ctx = context.Background()
+}
+
+func CacheLPush(key string, values ...interface{}) {
+	CacheConnect()
+	err := cache.LPush(ctx, key, values).Err()
+	if err != nil {
+		ErrorLog(err)
+		panic(err) // Can't survive massive redis failure
+	}
+}
+
+func CacheBLPop(key string) int {
+	CacheConnect()
+	str := cache.BLPop(ctx, 0, key).Val()[1]
+	id, _ := strconv.Atoi(str)
+	return id
+}
+
+func CacheSet(key string, obj interface{}) {
+	CacheConnect()
+	ret, _ := json.Marshal(obj)
+	err := cache.Set(ctx, key, ret, 0).Err()
+	if err != nil {
+		ErrorLog(err)
+		panic(err) // Can't survive massive redis failure
+	}
+}
+
+func CacheGet(key string, ptr interface{}) error {
+	CacheConnect()
+	cmd := cache.Get(ctx, key)
+	if cmd.Err() != nil {
+		return cmd.Err() // Likely simply a cache miss
+	}
+	bytes := []byte(cmd.Val())
+	err := json.Unmarshal(bytes, ptr)
+	return err
+}
+
+func CacheSAdd(key string, id int) {
+	CacheConnect()
+	err := cache.SAdd(ctx, key, fmt.Sprintf("%d", id)).Err()
+	if err != nil {
+		ErrorLog(err)
+		panic(err) // Can't survive massive redis failure
+	}
+}
+
+func CacheSMembers(key string) []int {
+	CacheConnect()
+	ret := []int{}
+	cmd := cache.SMembers(ctx, key)
+	if cmd.Err() != nil {
+		ErrorLog(cmd.Err())
+		return ret // Likely simply a cache miss
+	}
+	members := cmd.Val()
+	for i := range members {
+		member, _ := strconv.Atoi(members[i])
+		ret = append(ret, member)
+	}
+	return ret
+}
+
+func CacheKeys(key string) []string {
+	CacheConnect()
+	cmd := cache.Keys(ctx, fmt.Sprintf("%s:*", key))
+	if cmd.Err() != nil {
+		ErrorLog(cmd.Err())
+		return []string{} // Likely simply a cache miss
+	}
+	return cmd.Val()
+}
+
+func CacheFlushAll() error {
+	CacheConnect()
+	return cache.FlushAll(ctx).Err()
 }
 
 func DbConnect() (*sqlx.DB, error) {
@@ -189,6 +287,23 @@ func DbNamedExec(query string, ptr interface{}) error {
 	log.Printf("DbNamedExec: %s", query)
 	_, err = db.NamedExec(query, ptr)
 	return err
+}
+
+func DbListen(channel string) (*pq.Listener, error) {
+	reportProblem := func(ev pq.ListenerEventType, err error) {
+		if err != nil {
+			ErrorLog(err)
+		}
+	}
+
+	c, err := Config("database.connect")
+	if err != nil {
+		return nil, err
+	}
+
+	listener := pq.NewListener(c, 10*time.Second, time.Minute, reportProblem)
+	err = listener.Listen(channel)
+	return listener, err
 }
 
 func Round(x, unit float64) float64 {
