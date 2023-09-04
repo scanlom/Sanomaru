@@ -20,6 +20,7 @@ func setupRouter(router *mux.Router) {
 
 func JobValuationCutInternal() (error) {
 	log.Println("JobValuationCutInternal: Called...")
+	CONST_FX_EUR := 0.90
 	CONST_FX_GBP := 76.34
 	CONST_FX_HKD := 7.79
 	CONST_FX_JPY := 104.01
@@ -32,6 +33,7 @@ func JobValuationCutInternal() (error) {
 		/*"BATS.L"*/ 3280: CONST_FX_GBP,
 		/*"DWL.L"*/ 3737: CONST_FX_GBP,
 		/*"U11.SI"*/ 3126: CONST_FX_SGD,
+		/*"BOL.PA"*/ 55: CONST_FX_EUR,
 	}
 
 	// Update price, value, index for all active by price positions
@@ -65,9 +67,8 @@ func JobValuationCutInternal() (error) {
 	}
 
 	// Update index for all active by value positions
-	// MSTODO: How do we handle sell down to zero? Doesn't matter now because divisor is always zero
 	for i := range positions {
-		if positions[i].Active && cmn.CONST_PRICING_TYPE_BY_VALUE == positions[i].PricingType {
+		if positions[i].Active && cmn.CONST_PRICING_TYPE_BY_VALUE == positions[i].PricingType && positions[i].Value > cmn.CONST_FUDGE {
 			positions[i].Index = positions[i].Value * positions[i].Divisor
 			err = api.PutPosition(positions[i])
 			if err != nil {
@@ -235,7 +236,6 @@ func ExecuteBookTransaction(w http.ResponseWriter, r *http.Request) {
 		position.TotalCashInfusion -= ret.Value
 
 		// Did we sell down to zero? Float qty's (VNE) caught us out in our python script, so we compare with a fudge
-		// MSTODO: Handle CONST_PRICING_TYPE_BY_VALUE positions sold down to zero
 		if (position.PricingType == cmn.CONST_PRICING_TYPE_BY_PRICE && position.Quantity - ret.Quantity < cmn.CONST_FUDGE) ||
 			(position.PricingType == cmn.CONST_PRICING_TYPE_BY_VALUE && position.Value - ret.Value < cmn.CONST_FUDGE) {
 			position.CostBasis = 0.0

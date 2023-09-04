@@ -20,6 +20,7 @@ import (
 // MSTODO: Will keep this named redis.go until I'm ready to delete the current cache.go, then will swap in
 // MSTODO: Should have alerting if a microservice isn't running
 // MSTOMAYBE: Should i use native redis json?
+// MSTOMAYBE: Bounce daily?
 
 func CalculateReturn(table string, idCol string, id int, index float64, date string, interval string, years float64) float64 {
 	var start float64

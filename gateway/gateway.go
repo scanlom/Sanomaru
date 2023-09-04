@@ -54,6 +54,7 @@ func EnrichedMergersPositionsTotal(w http.ResponseWriter, r *http.Request) {
 
 	total := api.JsonEnrichedMerger{}
 	total.TargetTicker = "Total"
+	total.Status = "O"
 	keys := cmn.CacheKeys("enriched_mergers")
 	for i := range keys {
 		em := api.JsonEnrichedMerger{}

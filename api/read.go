@@ -196,6 +196,13 @@ func EnrichedMergersPositions(slice *[]JsonEnrichedMerger) error {
 	)
 }
 
+func EnrichedMergersResearch(slice *[]JsonEnrichedMerger) error {
+	return RestGetByUrl("EnrichedMergersResearch",
+		"http://localhost:8086/blue-lion/gateway/enriched-mergers-research",
+		slice,
+	)
+}
+
 func Positions(slice *[]JsonPosition) error {
 	return RestGetByUrl("Positions",
 		"http://localhost:8081/blue-lion/read/positions",

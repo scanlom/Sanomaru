@@ -565,20 +565,46 @@ func RefDataPositions(w http.ResponseWriter, r *http.Request) {
 func RefDataFocus(w http.ResponseWriter, r *http.Request) {
 	cmn.Enter("RefDataFocus", w, r)
 
-	db, err := cmn.DbConnect()
+	// Focus means watch list and open mergers
+	ret := []api.JsonRefData{}
+	projections := []api.JsonProjections{}
+	err := api.Projections(&projections)
 	if err != nil {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
-	foo := api.JsonRefData{}
-	ret := []api.JsonRefData{}
-	err = db.Select(&ret, fmt.Sprintf("%s WHERE active=true AND focus=true", api.JsonToSelect(foo, "ref_data", "")))
+	for i := range projections {
+		if projections[i].Watch {
+			refData := api.JsonRefData{}
+			err = api.RefDataByID(projections[i].RefDataID, &refData)
+			if err != nil {
+				cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+				return
+			}
+			ret = append(ret, refData)
+		}
+	}
+
+	mergers := []api.JsonEnrichedMerger{}
+	err = api.EnrichedMergersResearch(&mergers)
 	if err != nil {
-		log.Println(err)
-		w.WriteHeader(http.StatusInternalServerError)
+		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
+
+	for i := range mergers {
+		if mergers[i].Status == "O" {
+			refData := api.JsonRefData{}
+			err = api.RefDataByID(mergers[i].TargetRefDataID, &refData)
+			if err != nil {
+				cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+				return
+			}
+			ret = append(ret, refData)
+		}
+	}	
+
 	json.NewEncoder(w).Encode(&ret)
 
 	cmn.Exit("RefDataFocus", ret)

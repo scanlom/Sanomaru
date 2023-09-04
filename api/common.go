@@ -30,7 +30,6 @@ type JsonRefData struct {
 	Sector             string `json:"sector" db:"sector"`
 	Industry           string `json:"industry" db:"industry"`
 	Active             bool   `json:"active" db:"active"`
-	Focus              bool   `json:"focus" db:"focus"`
 }
 
 type JsonMarketData struct {
