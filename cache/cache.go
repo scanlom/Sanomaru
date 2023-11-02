@@ -80,6 +80,7 @@ func (cache *ProjectionsCache) RefreshStatsByArray(projections []api.JsonEnriche
 
 func (cache *ProjectionsCache) RefreshStats() {
 	cache.Stats = api.JsonProjectionsStats{}
+	cache.Stats.PW1 = true // PW1 is true to begin and is set false if we run into something !fresh
 	cache.RefreshStatsByArray(cache.PositionsProjections)
 	cache.RefreshStatsByArray(cache.WatchProjections)
 	cache.RefreshStatsByArray(cache.ResearchProjections)
@@ -121,7 +122,7 @@ func (cache *ProjectionsCache) Sift() error {
 			cache.PositionsProjections = append(cache.PositionsProjections, ep)
 		} else if ep.Watch {
 			cache.WatchProjections = append(cache.WatchProjections, ep)
-		} else {
+		} else if ep.Active {
 			cache.ResearchProjections = append(cache.ResearchProjections, ep)
 		}
 	}

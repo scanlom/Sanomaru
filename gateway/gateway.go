@@ -87,11 +87,14 @@ func EnrichedMergersResearch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	sort.Slice(ret, func(i, j int) bool {
-		if api.MergerStatusToInt(ret[i].Status) == api.MergerStatusToInt(ret[j].Status) && ret[i].MarketNetReturnAnnualized == ret[j].MarketNetReturnAnnualized {
-			return ret[i].ID < ret[j].ID
-		}
 		if api.MergerStatusToInt(ret[i].Status) == api.MergerStatusToInt(ret[j].Status) {
-			return ret[i].MarketNetReturnAnnualized > ret[j].MarketNetReturnAnnualized
+			if ret[i].Status == "O" {
+				return ret[i].MarketNetReturnAnnualized > ret[j].MarketNetReturnAnnualized
+			} else if ret[i].Status == "C" {
+				return ret[i].CloseDate > ret[j].CloseDate
+			} else if ret[i].Status == "B" {
+				return ret[i].BreakDate > ret[j].BreakDate
+			}
 		}
 		return api.MergerStatusToInt(ret[i].Status) > api.MergerStatusToInt(ret[j].Status)
 	})

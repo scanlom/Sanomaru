@@ -96,6 +96,7 @@ func EnrichProjections(p JsonProjections) (JsonEnrichedProjections, error) {
 	ep.Description = refData.Description
 	ep.Sector = refData.Sector
 	ep.Industry = refData.Industry
+	ep.Active = refData.Active
 	var summary []JsonSummary
 	err = SummaryByTicker(ep.Ticker, &summary)
 	if err != nil {

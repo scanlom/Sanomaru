@@ -212,6 +212,7 @@ type JsonEnrichedProjections struct {
 	Sector      string  `json:"sector" db:"sector"`
 	Industry    string  `json:"industry" db:"industry"`
 	Price       float64 `json:"price" db:"price"`
+	Active      bool    `json:"active" db:"active"`
 	// Position
 	PercentPortfolio float64 `json:"percentPortfolio" db:"percent_portfolio"`
 	// Derived - Financials
