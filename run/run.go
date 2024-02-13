@@ -18,17 +18,18 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/run/execute-roll-back-transaction", ExecuteRollBackTransaction).Methods("GET")
 }
 
-func JobValuationCutInternal() (error) {
+func JobValuationCutInternal() error {
 	log.Println("JobValuationCutInternal: Called...")
-	CONST_FX_EUR := 0.90
-	CONST_FX_GBP := 76.34
+	CONST_FX_EUR := 0.92
+	CONST_FX_GBP := 79.34
 	CONST_FX_HKD := 7.79
-	CONST_FX_JPY := 104.01
+	CONST_FX_JPY := 148.16
 	CONST_FX_SGD := 1.35
 	rates := map[int]float64{
 		/*"1373.HK"*/ 76: CONST_FX_HKD,
 		/*"2788.HK"*/ 3288: CONST_FX_HKD,
 		/*"6670.T"*/ 2451: CONST_FX_JPY,
+		/*"8074.T"*/ 3303: CONST_FX_JPY,
 		/*"MRO.L"*/ 97: CONST_FX_GBP,
 		/*"BATS.L"*/ 3280: CONST_FX_GBP,
 		/*"DWL.L"*/ 3737: CONST_FX_GBP,
@@ -50,7 +51,7 @@ func JobValuationCutInternal() (error) {
 			if err != nil {
 				return err
 			}
-		
+
 			fx := 1.0
 			if val, ok := rates[positions[i].RefDataID]; ok {
 				fx = val
@@ -236,8 +237,8 @@ func ExecuteBookTransaction(w http.ResponseWriter, r *http.Request) {
 		position.TotalCashInfusion -= ret.Value
 
 		// Did we sell down to zero? Float qty's (VNE) caught us out in our python script, so we compare with a fudge
-		if (position.PricingType == cmn.CONST_PRICING_TYPE_BY_PRICE && position.Quantity - ret.Quantity < cmn.CONST_FUDGE) ||
-			(position.PricingType == cmn.CONST_PRICING_TYPE_BY_VALUE && position.Value - ret.Value < cmn.CONST_FUDGE) {
+		if (position.PricingType == cmn.CONST_PRICING_TYPE_BY_PRICE && position.Quantity-ret.Quantity < cmn.CONST_FUDGE) ||
+			(position.PricingType == cmn.CONST_PRICING_TYPE_BY_VALUE && position.Value-ret.Value < cmn.CONST_FUDGE) {
 			position.CostBasis = 0.0
 			position.Quantity = 0.0
 			position.Value = 0.0
