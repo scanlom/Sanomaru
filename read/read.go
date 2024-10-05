@@ -79,6 +79,7 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/transactions", TransactionsByPositionID).Methods("GET").Queries("positionId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/transactions", TransactionsByPortfolioID).Methods("GET").Queries("portfolioId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/transactions", Transactions).Methods("GET")
+	router.HandleFunc("/blue-lion/read/factors", FactorsByTicker).Queries("ticker", "").Methods("GET")
 	router.Methods("GET").Path("/blue-lion/read/scalar").HandlerFunc(Scalar)
 }
 
@@ -603,7 +604,7 @@ func RefDataFocus(w http.ResponseWriter, r *http.Request) {
 			}
 			ret = append(ret, refData)
 		}
-	}	
+	}
 
 	json.NewEncoder(w).Encode(&ret)
 
@@ -1090,6 +1091,49 @@ func SummaryByTicker(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(&ret)
 
 	cmn.Exit("Read-SummaryByTicker", ret)
+}
+
+func FactorsByTicker(w http.ResponseWriter, r *http.Request) {
+	cmn.Enter("Read-FactorsByTicker", w, r)
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	args := new(cmn.RestTickerInput)
+	decoder := schema.NewDecoder()
+	err := decoder.Decode(args, r.URL.Query())
+	if err != nil {
+		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		return
+	}
+
+	var income []api.JsonIncome
+	err = api.IncomeByTicker(args.Ticker, &income)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	ret := []api.JsonFactors{}
+
+	for i := range income {
+		f := api.JsonFactors{}
+		f.ReportDate = income[i].ReportDate
+		f.Revenue = income[i].Revenue
+		f.SharesDiluted = income[i].SharesDiluted
+		f.EPS = income[i].EPS
+		if i > 0 {
+			f.RevenueGrowth = cmn.Round(float64(income[0].Revenue)/float64(f.Revenue), 0.0001) - 1.0
+			f.RevenueCagr = math.Pow(f.RevenueGrowth+1.0, 1.0/float64(i)) - 1.0
+			f.SharesDilutedGrowth = cmn.Round(float64(f.SharesDiluted)/float64(income[0].SharesDiluted), 0.0001) - 1.0
+			f.SharesDilutedCagr = math.Pow(f.SharesDilutedGrowth+1.0, 1.0/float64(i)) - 1.0
+			f.EPSGrowth = cmn.Round(float64(income[0].EPS)/float64(f.EPS), 0.0001) - 1.0
+			f.EPSCagr = math.Pow(f.EPSGrowth+1.0, 1.0/float64(i)) - 1.0
+		}
+		ret = append(ret, f)
+	}
+	json.NewEncoder(w).Encode(&ret)
+
+	cmn.Exit("Read-FactorsByTicker", ret)
 }
 
 func Mergers(w http.ResponseWriter, r *http.Request) {

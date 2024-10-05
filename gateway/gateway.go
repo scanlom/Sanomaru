@@ -54,17 +54,23 @@ func EnrichedMergersPositionsTotal(w http.ResponseWriter, r *http.Request) {
 
 	total := api.JsonEnrichedMerger{}
 	total.TargetTicker = "Total"
+	total.Active = true
 	total.Status = "O"
 	keys := cmn.CacheKeys("enriched_mergers")
 	for i := range keys {
 		em := api.JsonEnrichedMerger{}
 		err := cmn.CacheGet(keys[i], &em)
-		if err == nil {
+		if err == nil && em.PercentPortfolio > 0 {
 			total.PercentPortfolio += em.PercentPortfolio
 			total.MarketNetReturn += em.MarketNetReturn * em.PercentPortfolio
 			total.MarketNetReturnAnnualized += em.MarketNetReturnAnnualized * em.PercentPortfolio
 			total.MarketPositiveReturn += em.MarketPositiveReturn * em.PercentPortfolio
 			total.MarketPositiveReturnAnnualized += em.MarketPositiveReturnAnnualized * em.PercentPortfolio
+			total.Confidence += em.Confidence * em.PercentPortfolio
+			total.StrikeReturn += em.StrikeReturn * em.PercentPortfolio
+			total.StrikeReturnAnnualized += em.StrikeReturnAnnualized * em.PercentPortfolio
+			total.PositionReturn += em.PositionReturn * em.PercentPortfolio
+			total.ProfitLifetime += em.ProfitLifetime
 		}
 	}
 	ret := []api.JsonEnrichedMerger{}
@@ -87,16 +93,29 @@ func EnrichedMergersResearch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	sort.Slice(ret, func(i, j int) bool {
-		if api.MergerStatusToInt(ret[i].Status) == api.MergerStatusToInt(ret[j].Status) {
-			if ret[i].Status == "O" {
-				return ret[i].MarketNetReturnAnnualized > ret[j].MarketNetReturnAnnualized
-			} else if ret[i].Status == "C" {
-				return ret[i].CloseDate > ret[j].CloseDate
-			} else if ret[i].Status == "B" {
-				return ret[i].BreakDate > ret[j].BreakDate
+		iTop := false
+		if ret[i].Active != ret[j].Active {
+			iTop = ret[i].Active
+		} else if ret[i].Status == "O" {
+			if ret[j].Status == "O" {
+				iTop = ret[i].MarketNetReturnAnnualized > ret[j].MarketNetReturnAnnualized
+			} else {
+				iTop = true
 			}
+		} else if ret[j].Status == "O" {
+			iTop = false
+		} else {
+			iDate := ret[i].CloseDate
+			jDate := ret[j].CloseDate
+			if ret[i].Status == "B" {
+				iDate = ret[i].BreakDate
+			}
+			if ret[j].Status == "B" {
+				jDate = ret[j].BreakDate
+			}
+			iTop = iDate > jDate
 		}
-		return api.MergerStatusToInt(ret[i].Status) > api.MergerStatusToInt(ret[j].Status)
+		return iTop
 	})
 	json.NewEncoder(w).Encode(&ret)
 

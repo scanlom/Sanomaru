@@ -274,6 +274,7 @@ type JsonMerger struct {
 	Confidence        float64 `json:"confidence" db:"confidence"`
 	Dividends         float64 `json:"dividends" db:"dividends"`
 	Cash              float64 `json:"cash" db:"cash"`
+	Active            bool    `json:"active" db:"active"`
 }
 
 type JsonEnrichedMerger struct {
@@ -396,6 +397,22 @@ type JsonTransaction struct {
 	PortfolioBefore types.JSONText `json:"portfolioBefore" db:"portfolio_before"`
 	PortfolioAfter  types.JSONText `json:"portfolioAfter" db:"portfolio_after"`
 	Note            string         `json:"note" db:"note"`
+}
+
+type JsonFactors struct {
+	ReportDate          string  `json:"reportDate"`
+	Revenue             int64   `json:"revenue"`
+	RevenueGrowth       float64 `json:"revenueGrowth"`
+	RevenueCagr         float64 `json:"revenueCagr"`
+	NetMgn              float64 `json:"netMgn"`
+	NetMgnGrowth        float64 `json:"NetMgnGrowth"`
+	NetMgnCagr          float64 `json:"NetMgnCagr"`
+	SharesDiluted       int64   `json:"sharesDiluted"`
+	SharesDilutedGrowth float64 `json:"sharesDilutedGrowth"`
+	SharesDilutedCagr   float64 `json:"sharesDilutedCagr"`
+	EPS       float64 `json:"eps"`
+	EPSGrowth float64 `json:"epsGrowth"`
+	EPSCagr   float64 `json:"epsCagr"`
 }
 
 func JsonToNamedInsertInternal(t reflect.Type, cols *string, params *string) {
