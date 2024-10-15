@@ -167,6 +167,16 @@ func CacheConnect() {
 	ctx = context.Background()
 }
 
+func CacheClose() {
+	err := cache.Close()
+	if err != nil {
+		ErrorLog(err)
+		panic(err) // Can't survive massive redis failure
+	} else {
+		log.Println("CacheClose: Closed connection")
+	}
+}
+
 func CacheLPush(key string, values ...interface{}) {
 	CacheConnect()
 	err := cache.LPush(ctx, key, values).Err()
