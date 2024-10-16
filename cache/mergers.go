@@ -99,8 +99,8 @@ func MergersWork(ptr interface{}) {
 	merger := *ptr.(*api.JsonMerger)
 
 	// 1. Add secondary indices
-	cmn.CacheSAdd(fmt.Sprintf("%s:%d", "mergers_by_ref_data_id", merger.AcquirerRefDataID), merger.ID)
-	cmn.CacheSAdd(fmt.Sprintf("%s:%d", "mergers_by_ref_data_id", merger.TargetRefDataID), merger.ID)
+	cmn.CacheSAdd(fmt.Sprintf("%s:%d", "s_mergers_by_ref_data_id", merger.AcquirerRefDataID), merger.ID)
+	cmn.CacheSAdd(fmt.Sprintf("%s:%d", "s_mergers_by_ref_data_id", merger.TargetRefDataID), merger.ID)
 
 	// 2. Update graph
 	PopulateEnrichedMerger(merger.ID)

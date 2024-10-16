@@ -35,5 +35,12 @@ func EnrichYTDPortfolioReturns(r *api.JsonReturns, value float64, index float64,
 }
 
 func PortfoliosWork(ptr interface{}) {
-	// port := *ptr.(*api.JsonPortfolio)
+	port := *ptr.(*api.JsonPortfolio)
+
+	// 1. Add secondary indices
+	// NOOP
+
+	// 2. Update graph
+	cmn.CacheSMembersAndProcess(fmt.Sprintf("%s:%d", "s_positions_by_portfolio_id", port.ID), PopulateEnrichedPosition)
+	// Position will then update any associated mergers
 }

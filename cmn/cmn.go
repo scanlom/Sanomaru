@@ -9,6 +9,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"os"
 	"runtime"
 	"strconv"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
+	"gopkg.in/yaml.v2"
 )
 
 const CONST_PRICING_TYPE_BY_PRICE = 1
@@ -223,6 +225,15 @@ func CacheSAdd(key string, id int) {
 	}
 }
 
+type process func(int)
+
+func CacheSMembersAndProcess(key string, process process) {
+	ids := CacheSMembers(key)
+	for i := range ids {
+		process(ids[i])
+	}
+}
+
 func CacheSMembers(key string) []int {
 	CacheConnect()
 	ret := []int{}
@@ -348,24 +359,50 @@ type JsonStringValue struct {
 	Value string `json:"value"`
 }
 
+type Yaml struct {
+	Email struct {
+		Server   string `yaml:"server"`
+		Port     int    `yaml:"port"`
+		User     string `yaml:"user"`
+		Password string `yaml:"password"`
+	} `yaml:"email"`
+	Database struct {
+		Connect string `yaml:"connect"`
+	} `yaml:"database"`
+}
+
+type ConfigInput struct {
+	Name string `schema:"name"`
+}
+
+type ConfigRet struct {
+	Value string `json:"value"`
+}
+
 func Config(name string) (string, error) {
 	log.Println("Api.Config: Called...")
-	response, err := http.Get(fmt.Sprintf("http://localhost:8082/blue-lion/config?name=%s", name))
+
+	yamlFile, err := os.ReadFile("/home/scanlom/.Sanomaru")
 	if err != nil {
-		return "", err
+		log.Printf("Config: /home/scanlom/.Sanomaru err #%v ", err)
+		panic(err) // Can't survive missing config
 	}
 
-	data, err := ioutil.ReadAll(response.Body)
+	var y Yaml
+	err = yaml.Unmarshal(yamlFile, &y)
 	if err != nil {
-		return "", err
+		log.Printf("Config: Unmarshal: %v", err)
+		panic(err) // Can't survive missing config
 	}
 
-	var val JsonStringValue
-	err = json.Unmarshal(data, &val)
-	if err != nil {
-		return "", err
+	result := ""
+	if name == "database.connect" {
+		result = y.Database.Connect
+	} else {
+		log.Printf("Config: Unknown Name: %s", name)
+		panic(err) // Can't survive missing config
 	}
 
 	log.Println("Api.Config: Success!")
-	return val.Value, nil
+	return result, nil
 }

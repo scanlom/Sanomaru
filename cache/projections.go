@@ -2,12 +2,15 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/scanlom/Sanomaru/api"
 	"github.com/scanlom/Sanomaru/cmn"
 )
 
 func PopulateEnrichedProjections(id int) {
+	log.Printf("PopulateEnrichedProjections called for ID %d", id)
+
 	// 1. Enrich and add
 	projections := api.JsonProjections{}
 	err := cmn.CacheGet(fmt.Sprintf("%s:%d", "projections", id), &projections)
@@ -33,7 +36,7 @@ func ProjectionsWork(ptr interface{}) {
 	proj := *ptr.(*api.JsonProjections)
 
 	// 1. Add secondary indices
-	// NOOP
+	cmn.CacheSAdd(fmt.Sprintf("%s:%d", "s_projections_by_ref_data_id", proj.RefDataID), proj.ID)
 
 	// 2. Enrich and add
 	PopulateEnrichedProjections(proj.ID)

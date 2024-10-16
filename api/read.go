@@ -314,13 +314,3 @@ func PositionsHistoryFirst(positionId int, date string, ret *JsonPositionHistory
 		ret,
 	)
 }
-
-func ProjectionsUpdateByID(id int) error {
-	log.Println("Api.ProjectionsUpdateByID: Called...")
-	_, err := http.Get(fmt.Sprintf("http://localhost:8084/blue-lion/cache/projections-update/%d", id))
-	if err != nil {
-		return err
-	}
-	log.Println("Api.ProjectionsUpdateByID: Success!")
-	return nil
-}

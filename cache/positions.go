@@ -118,17 +118,15 @@ func PopulateEnrichedPosition(id int) {
 
 	// 3. Update graph
 	PopulateEnrichedPositionReturns(id)
-	ids := cmn.CacheSMembers(fmt.Sprintf("%s:%d", "mergers_by_ref_data_id", ep.RefDataID))
-	for i := range ids {
-		PopulateEnrichedMerger(ids[i])
-	}
+	cmn.CacheSMembersAndProcess(fmt.Sprintf("%s:%d", "s_mergers_by_ref_data_id", ep.RefDataID), PopulateEnrichedMerger)
 }
 
 func PositionsWork(ptr interface{}) {
 	pos := *ptr.(*api.JsonPosition)
 
 	// 1. Add secondary indices
-	cmn.CacheSAdd(fmt.Sprintf("%s:%d", "positions_by_ref_data_id", pos.RefDataID), pos.ID)
+	cmn.CacheSAdd(fmt.Sprintf("%s:%d", "s_positions_by_ref_data_id", pos.RefDataID), pos.ID)
+	cmn.CacheSAdd(fmt.Sprintf("%s:%d", "s_positions_by_portfolio_id", pos.PortfolioID), pos.ID)
 
 	// 2. Update graph
 	PopulateEnrichedPosition(pos.ID)

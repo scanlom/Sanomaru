@@ -215,17 +215,11 @@ func Projections(w http.ResponseWriter, r *http.Request) {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
-	err = api.ProjectionsUpdateByID(ret.ID)
-	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
-		return
-	}
 }
 
 func ProjectionsByID(w http.ResponseWriter, r *http.Request) {
 	var ret api.JsonProjections
 	RestHandlePut(w, r, "Write-ProjectionsByID", &ret, ret, "projections")
-	api.ProjectionsUpdateByID(ret.ID)
 }
 
 func PortfoliosByID(w http.ResponseWriter, r *http.Request) {
@@ -494,9 +488,6 @@ func EnrichedProjectionsJournal(w http.ResponseWriter, r *http.Request) {
 		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
-
-	// Notify out that a projection has been updated
-	api.ProjectionsUpdateByID(ret.ProjectionsID)
 
 	json.NewEncoder(w).Encode(&ret)
 	cmn.Exit("Write-EnrichedProjectionsJournal", &ret)

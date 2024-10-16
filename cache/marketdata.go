@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/scanlom/Sanomaru/api"
 	"github.com/scanlom/Sanomaru/cmn"
@@ -9,6 +10,7 @@ import (
 
 func MarketDataWork(ptr interface{}) {
 	md := *ptr.(*api.JsonMarketData)
+	log.Printf("market_data update for %d", md.ID)
 
 	// 1. Add secondary indices
 	cmn.CacheSet(fmt.Sprintf("%s:%d", "market_data_by_ref_data_id", md.RefDataID), md)
@@ -19,12 +21,7 @@ func MarketDataWork(ptr interface{}) {
 	}
 
 	// 2. Update graph
-	ids := cmn.CacheSMembers(fmt.Sprintf("%s:%d", "positions_by_ref_data_id", md.RefDataID))
-	for i := range ids {
-		cmn.CacheLPush(fmt.Sprintf("%s_update", "positions"), ids[i])
-	}
-	ids = cmn.CacheSMembers(fmt.Sprintf("%s:%d", "mergers_by_ref_data_id", md.RefDataID))
-	for i := range ids {
-		PopulateEnrichedMerger(ids[i])
-	}
+	cmn.CacheSMembersAndProcess(fmt.Sprintf("%s:%d", "s_positions_by_ref_data_id", md.RefDataID), PopulateEnrichedPosition)
+	cmn.CacheSMembersAndProcess(fmt.Sprintf("%s:%d", "s_mergers_by_ref_data_id", md.RefDataID), PopulateEnrichedMerger)
+	cmn.CacheSMembersAndProcess(fmt.Sprintf("%s:%d", "s_projections_by_ref_data_id", md.RefDataID), PopulateEnrichedProjections)
 }
