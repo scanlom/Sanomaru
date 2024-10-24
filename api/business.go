@@ -2,8 +2,6 @@ package api
 
 import (
 	"math"
-
-	"github.com/scanlom/Sanomaru/cmn"
 )
 
 func Cagr(years float64, projections JsonProjections, md JsonMarketData) float64 {
@@ -79,10 +77,6 @@ func HeadlineFromSummary(summary []JsonSummary, peHighMmo5yr *int, peLowMmo5yr *
 	}
 }
 
-func Round(x, unit float64) float64 {
-	return math.Round(x/unit) * unit
-}
-
 func EnrichProjections(p JsonProjections) (JsonEnrichedProjections, error) {
 	ep := JsonEnrichedProjections{JsonProjections: p}
 
@@ -140,7 +134,7 @@ func EnrichProjections(p JsonProjections) (JsonEnrichedProjections, error) {
 	}
 
 	var position JsonEnrichedPosition
-	err = EnrichedPositionsBySymbolPortfolioID(ep.Ticker, cmn.CONST_PORTFOLIO_SELFIE, &position)
+	err = EnrichedPositionsBySymbolPortfolioID(ep.Ticker, CONST_PORTFOLIO_SELFIE, &position)
 	// Don't pass the error up, it's ok if this isn't a position, we just populate zero
 	if err == nil {
 		ep.PercentPortfolio = position.PercentPortfolio
@@ -152,15 +146,15 @@ func EnrichProjections(p JsonProjections) (JsonEnrichedProjections, error) {
 func ConfidenceToInt(c string) int {
 	switch c {
 	case "H":
-		return cmn.CONST_CONFIDENCE_HIGH
+		return CONST_CONFIDENCE_HIGH
 	case "M":
-		return cmn.CONST_CONFIDENCE_MEDIUM
+		return CONST_CONFIDENCE_MEDIUM
 	case "N":
-		return cmn.CONST_CONFIDENCE_NONE
+		return CONST_CONFIDENCE_NONE
 	case "B":
-		return cmn.CONST_CONFIDENCE_BLAH
+		return CONST_CONFIDENCE_BLAH
 	case "L":
-		return cmn.CONST_CONFIDENCE_LOW
+		return CONST_CONFIDENCE_LOW
 	}
 	return 0
 }

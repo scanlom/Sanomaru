@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/scanlom/Sanomaru/api"
-	"github.com/scanlom/Sanomaru/cmn"
 )
 
 func CalculateReturn(table string, idCol string, id int, index float64, date string, interval string, years float64) float64 {
@@ -16,9 +15,9 @@ func CalculateReturn(table string, idCol string, id int, index float64, date str
 	query := "select index from %s where %s=%d and date=" +
 		"(select max(date) from %s where %s=%d and date <= (select date('%s') - interval '%s'))"
 	// If the value is not present, leave the return zero, don't handle error
-	_ = cmn.DbGet(&start, fmt.Sprintf(query, table, idCol, id, table, idCol, id, date, interval))
+	_ = api.DbGet(&start, fmt.Sprintf(query, table, idCol, id, table, idCol, id, date, interval))
 	if start > 0 {
-		ret = cmn.Round(math.Pow(index/start, 1/years)-1, 0.0001)
+		ret = api.Round(math.Pow(index/start, 1/years)-1, 0.0001)
 		log.Printf("CalculateReturn: start: %f, ret: %f", start, ret)
 	}
 	return ret
@@ -59,7 +58,7 @@ func EnrichYTDPositionReturns(r *api.JsonReturns, value float64, index float64, 
 	}
 
 	if physd.Index > 0 {
-		r.YearToDate = cmn.Round(index/physd.Index-1, 0.0001)
+		r.YearToDate = api.Round(index/physd.Index-1, 0.0001)
 	}
 	r.ProfitYearToDate = value - physd.Value - (tci - physd.TotalCashInfusion) + (divs - physd.AccumulatedDividends)
 	return nil
@@ -68,17 +67,17 @@ func EnrichYTDPositionReturns(r *api.JsonReturns, value float64, index float64, 
 func PopulateEnrichedPositionReturns(id int) {
 	// 1. Enrich and add
 	ep := api.JsonEnrichedPosition{}
-	err := cmn.CacheGet(fmt.Sprintf("%s:%d", "enriched_positions", id), &ep)
+	err := api.CacheGet(fmt.Sprintf("%s:%d", "enriched_positions", id), &ep)
 	if err != nil {
-		cmn.ErrorLog(err)
+		api.ErrorLog(err)
 		return // Nothing we can do if the enriched position doesn't exist
 	}
 	ret := EnrichReturns("positions_history", "position_id", ep.ID, ep.Symbol, ep.Value, ep.Index, ep.TotalCashInfusion, ep.AccumulatedDividends, time.Now().Format("2006-01-02"))
 	err = EnrichYTDPositionReturns(&ret, ep.Value, ep.Index, ep.TotalCashInfusion, ep.AccumulatedDividends, time.Now().Format("2006-01-02"))
 	if err != nil {
-		cmn.ErrorLog(err) // Strange, but survivable
+		api.ErrorLog(err) // Strange, but survivable
 	}
-	cmn.CacheSet(fmt.Sprintf("%s:%d", "position_returns", ep.ID), ret)
+	api.CacheSet(fmt.Sprintf("%s:%d", "position_returns", ep.ID), ret)
 
 	// 2. Add secondary indices
 	// NOOP
@@ -90,43 +89,43 @@ func PopulateEnrichedPositionReturns(id int) {
 func PopulateEnrichedPosition(id int) {
 	// 1. Enrich and add
 	position := api.JsonPosition{}
-	err := cmn.CacheGet(fmt.Sprintf("%s:%d", "positions", id), &position)
+	err := api.CacheGet(fmt.Sprintf("%s:%d", "positions", id), &position)
 	if err != nil {
-		cmn.ErrorLog(err)
+		api.ErrorLog(err)
 		return // Nothing we can do if the position doesn't exist
 	}
 	ep := api.JsonEnrichedPosition{JsonPosition: position}
 	rd := api.JsonRefData{}
-	err = cmn.CacheGet(fmt.Sprintf("%s:%d", "ref_data", ep.RefDataID), &rd)
+	err = api.CacheGet(fmt.Sprintf("%s:%d", "ref_data", ep.RefDataID), &rd)
 	if err != nil {
-		cmn.ErrorLog(err) // Strange, but survivable
+		api.ErrorLog(err) // Strange, but survivable
 	}
 	ep.Symbol = rd.Symbol
 	ep.Description = rd.Description
 	port := api.JsonPortfolio{}
-	err = cmn.CacheGet(fmt.Sprintf("%s:%d", "portfolios", ep.PortfolioID), &port)
+	err = api.CacheGet(fmt.Sprintf("%s:%d", "portfolios", ep.PortfolioID), &port)
 	if err != nil {
-		cmn.ErrorLog(err) // Strange, but survivable
+		api.ErrorLog(err) // Strange, but survivable
 	}
 	if ep.Active && port.Value > 0 {
-		ep.PercentPortfolio = cmn.Round(ep.Value/port.Value, 0.0001)
+		ep.PercentPortfolio = api.Round(ep.Value/port.Value, 0.0001)
 	}
-	cmn.CacheSet(fmt.Sprintf("%s:%d", "enriched_positions", ep.ID), ep)
+	api.CacheSet(fmt.Sprintf("%s:%d", "enriched_positions", ep.ID), ep)
 
 	// 2. Add secondary indices
-	cmn.CacheSet(fmt.Sprintf("%s:%s:%d", "enriched_positions_by_symbol_portfolio_id", ep.Symbol, ep.PortfolioID), ep)
+	api.CacheSet(fmt.Sprintf("%s:%s:%d", "enriched_positions_by_symbol_portfolio_id", ep.Symbol, ep.PortfolioID), ep)
 
 	// 3. Update graph
 	PopulateEnrichedPositionReturns(id)
-	cmn.CacheSMembersAndProcess(fmt.Sprintf("%s:%d", "s_mergers_by_ref_data_id", ep.RefDataID), PopulateEnrichedMerger)
+	api.CacheSMembersAndProcess(fmt.Sprintf("%s:%d", "s_mergers_by_ref_data_id", ep.RefDataID), PopulateEnrichedMerger)
 }
 
 func PositionsWork(ptr interface{}) {
 	pos := *ptr.(*api.JsonPosition)
 
 	// 1. Add secondary indices
-	cmn.CacheSAdd(fmt.Sprintf("%s:%d", "s_positions_by_ref_data_id", pos.RefDataID), pos.ID)
-	cmn.CacheSAdd(fmt.Sprintf("%s:%d", "s_positions_by_portfolio_id", pos.PortfolioID), pos.ID)
+	api.CacheSAdd(fmt.Sprintf("%s:%d", "s_positions_by_ref_data_id", pos.RefDataID), pos.ID)
+	api.CacheSAdd(fmt.Sprintf("%s:%d", "s_positions_by_portfolio_id", pos.PortfolioID), pos.ID)
 
 	// 2. Update graph
 	PopulateEnrichedPosition(pos.ID)

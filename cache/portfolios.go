@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/scanlom/Sanomaru/api"
-	"github.com/scanlom/Sanomaru/cmn"
 )
 
 func EnrichYTDPortfolioReturns(r *api.JsonReturns, value float64, index float64, tci float64, date string) error {
@@ -28,7 +27,7 @@ func EnrichYTDPortfolioReturns(r *api.JsonReturns, value float64, index float64,
 	}
 
 	if physd.Index > 0 {
-		r.YearToDate = cmn.Round(index/physd.Index-1, 0.0001)
+		r.YearToDate = api.Round(index/physd.Index-1, 0.0001)
 	}
 	r.ProfitYearToDate = value - physd.Value - (tci - physd.TotalCashInfusion)
 	return nil
@@ -41,6 +40,6 @@ func PortfoliosWork(ptr interface{}) {
 	// NOOP
 
 	// 2. Update graph
-	cmn.CacheSMembersAndProcess(fmt.Sprintf("%s:%d", "s_positions_by_portfolio_id", port.ID), PopulateEnrichedPosition)
+	api.CacheSMembersAndProcess(fmt.Sprintf("%s:%d", "s_positions_by_portfolio_id", port.ID), PopulateEnrichedPosition)
 	// Position will then update any associated mergers
 }

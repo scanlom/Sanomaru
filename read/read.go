@@ -14,7 +14,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/schema"
 	"github.com/scanlom/Sanomaru/api"
-	"github.com/scanlom/Sanomaru/cmn"
 )
 
 func setupRouter(router *mux.Router) {
@@ -84,33 +83,33 @@ func setupRouter(router *mux.Router) {
 }
 
 func RestHandleGet(w http.ResponseWriter, r *http.Request, msg string, ptr interface{}, obj interface{}, table string) {
-	cmn.Enter(msg, w, r)
+	api.Enter(msg, w, r)
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	err = db.Select(ptr, api.JsonToSelect(obj, table, ""))
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(ptr)
 
-	cmn.Exit(msg, ptr)
+	api.Exit(msg, ptr)
 }
 
 func RestHandleGetByID(w http.ResponseWriter, r *http.Request, msg string, ptr interface{}, obj interface{}, table string) {
-	cmn.Enter(msg, w, r)
+	api.Enter(msg, w, r)
 
 	params := mux.Vars(r)
 	id := params["id"]
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -122,29 +121,29 @@ func RestHandleGetByID(w http.ResponseWriter, r *http.Request, msg string, ptr i
 	}
 	json.NewEncoder(w).Encode(ptr)
 
-	cmn.Exit(msg, ptr)
+	api.Exit(msg, ptr)
 }
 
 func RestHandleGetBySymbol(w http.ResponseWriter, r *http.Request, msg string, ptr interface{}, obj interface{}, table string) {
-	cmn.Enter(msg, w, r)
+	api.Enter(msg, w, r)
 
-	args := new(cmn.RestSymbolInput)
+	args := new(api.RestSymbolInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
 	refDataID, err := api.SymbolToRefDataID(args.Symbol)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -156,29 +155,29 @@ func RestHandleGetBySymbol(w http.ResponseWriter, r *http.Request, msg string, p
 	}
 	json.NewEncoder(w).Encode(ptr)
 
-	cmn.Exit(msg, ptr)
+	api.Exit(msg, ptr)
 }
 
 func EnrichedProjectionsBySymbol(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-EnrichedProjectionsBySymbol", w, r)
+	api.Enter("Read-EnrichedProjectionsBySymbol", w, r)
 
-	args := new(cmn.RestSymbolInput)
+	args := new(api.RestSymbolInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
 	refDataID, err := api.SymbolToRefDataID(args.Symbol)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -189,41 +188,41 @@ func EnrichedProjectionsBySymbol(w http.ResponseWriter, r *http.Request) {
 	}
 	ep, err := api.EnrichProjections(p)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	json.NewEncoder(w).Encode(&ep)
-	cmn.Exit("Read-EnrichedProjectionsBySymbol", ep)
+	api.Exit("Read-EnrichedProjectionsBySymbol", ep)
 }
 
 func EnrichedProjectionsByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-EnrichedProjectionsByID", w, r)
+	api.Enter("Read-EnrichedProjectionsByID", w, r)
 
 	params := mux.Vars(r)
 	id := params["id"]
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	p := api.JsonProjections{}
 	err = db.Get(&p, api.JsonToSelect(p, "projections", "")+fmt.Sprintf(" WHERE id=%s", id))
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	ep, err := api.EnrichProjections(p)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	json.NewEncoder(w).Encode(&ep)
 
-	cmn.Exit("Read-EnrichedProjectionsByID", ep)
+	api.Exit("Read-EnrichedProjectionsByID", ep)
 }
 
 type EnrichedProjectionsJournalByProjectionsIDInput struct {
@@ -231,36 +230,36 @@ type EnrichedProjectionsJournalByProjectionsIDInput struct {
 }
 
 func EnrichedProjectionsJournalByProjectionsID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-EnrichedProjectionsJournalByProjectionsID", w, r)
+	api.Enter("Read-EnrichedProjectionsJournalByProjectionsID", w, r)
 
 	args := new(EnrichedProjectionsJournalByProjectionsIDInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	ret := []api.JsonEnrichedProjectionsJournal{}
 	err = db.Select(&ret, api.JsonToSelect(api.JsonEnrichedProjectionsJournal{}, "projections_journal", "")+fmt.Sprintf(" WHERE projections_id=%d ORDER BY id DESC", args.ProjectionsID))
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	sort.Slice(ret, func(i, j int) bool {
-		return cmn.DateStringToTime(ret[i].Date).After(cmn.DateStringToTime(ret[j].Date))
+		return api.DateStringToTime(ret[i].Date).After(api.DateStringToTime(ret[j].Date))
 	})
 
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-EnrichedProjectionsJournalByProjectionsID", ret)
+	api.Exit("Read-EnrichedProjectionsJournalByProjectionsID", ret)
 }
 
 func PositionsByID(w http.ResponseWriter, r *http.Request) {
@@ -274,25 +273,25 @@ func ProjectionsByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func ProjectionsBySymbol(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-ProjectionsBySymbol", w, r)
+	api.Enter("Read-ProjectionsBySymbol", w, r)
 
-	args := new(cmn.RestSymbolInput)
+	args := new(api.RestSymbolInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
 	refDataID, err := api.SymbolToRefDataID(args.Symbol)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -334,15 +333,15 @@ func ProjectionsBySymbol(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(&ret)
-	cmn.Exit("Read-ProjectionsBySymbol", &ret)
+	api.Exit("Read-ProjectionsBySymbol", &ret)
 }
 
 func MarketData(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("MarketData", w, r)
+	api.Enter("MarketData", w, r)
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -355,7 +354,7 @@ func MarketData(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("MarketData", ret)
+	api.Exit("MarketData", ret)
 }
 
 func MarketDataByID(w http.ResponseWriter, r *http.Request) {
@@ -369,46 +368,46 @@ func MarketDataBySymbol(w http.ResponseWriter, r *http.Request) {
 }
 
 func MarketDataByRefDataID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-MarketDataByRefDataID", w, r)
+	api.Enter("Read-MarketDataByRefDataID", w, r)
 
-	args := new(cmn.RestRefDataIDInput)
+	args := new(api.RestRefDataIDInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
 	ret := api.JsonMarketData{}
-	err = cmn.DbGet(&ret, api.JsonToSelect(api.JsonMarketData{}, fmt.Sprintf("market_data WHERE ref_data_id=%d", args.RefDataID), ""))
+	err = api.DbGet(&ret, api.JsonToSelect(api.JsonMarketData{}, fmt.Sprintf("market_data WHERE ref_data_id=%d", args.RefDataID), ""))
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-MarketDataByRefDataID", ret)
+	api.Exit("Read-MarketDataByRefDataID", ret)
 }
 
 func EnrichedMarketDataBySymbol(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-EnrichedMarketDataBySymbol", w, r)
+	api.Enter("Read-EnrichedMarketDataBySymbol", w, r)
 
-	args := new(cmn.RestSymbolInput)
+	args := new(api.RestSymbolInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
 	refDataID, err := api.SymbolToRefDataID(args.Symbol)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	var ret api.JsonEnrichedMarketData
-	err = cmn.DbGet(&ret, fmt.Sprintf("select id, ref_data_id, last, (updated_at < current_date - interval '4 days') as stale from market_data WHERE ref_data_id=%d", refDataID))
+	err = api.DbGet(&ret, fmt.Sprintf("select id, ref_data_id, last, (updated_at < current_date - interval '4 days') as stale from market_data WHERE ref_data_id=%d", refDataID))
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -416,29 +415,29 @@ func EnrichedMarketDataBySymbol(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-EnrichedMarketDataBySymbol", &ret)
+	api.Exit("Read-EnrichedMarketDataBySymbol", &ret)
 }
 
 func MDHYearSummaryBySymbol(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-MDHYearSummaryBySymbol", w, r)
+	api.Enter("Read-MDHYearSummaryBySymbol", w, r)
 
-	args := new(cmn.RestSymbolDateInput)
+	args := new(api.RestSymbolDateInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
 	refDataID, err := api.SymbolToRefDataID(args.Symbol)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -460,23 +459,23 @@ func MDHYearSummaryBySymbol(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-MDHYearSummaryBySymbol", ret)
+	api.Exit("Read-MDHYearSummaryBySymbol", ret)
 }
 
 func MDHByRefDataIDDate(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-MDHByRefDataIDDate", w, r)
+	api.Enter("Read-MDHByRefDataIDDate", w, r)
 
-	args := new(cmn.RestRefDataIDDateInput)
+	args := new(api.RestRefDataIDDateInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -489,29 +488,29 @@ func MDHByRefDataIDDate(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-MDHByRefDataIDDate", ret)
+	api.Exit("Read-MDHByRefDataIDDate", ret)
 }
 
 func MDHBySymbol(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-MDHBySymbol", w, r)
+	api.Enter("Read-MDHBySymbol", w, r)
 
-	args := new(cmn.RestSymbolDateInput)
+	args := new(api.RestSymbolDateInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
 	refDataID, err := api.SymbolToRefDataID(args.Symbol)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -533,26 +532,26 @@ func MDHBySymbol(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-MDHYearSummaryBySymbol", ret)
+	api.Exit("Read-MDHYearSummaryBySymbol", ret)
 }
 
 func RefDataPositions(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("RefDataPositions", w, r)
+	api.Enter("RefDataPositions", w, r)
 
 	ret := []api.JsonRefData{}
 	positions := []api.JsonPosition{}
 	err := api.Positions(&positions)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	for i := range positions {
-		if positions[i].PricingType == cmn.CONST_PRICING_TYPE_BY_PRICE {
+		if positions[i].PricingType == api.CONST_PRICING_TYPE_BY_PRICE {
 			refData := api.JsonRefData{}
 			err = api.RefDataByID(positions[i].RefDataID, &refData)
 			if err != nil {
-				cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+				api.ErrorHttp(err, w, http.StatusInternalServerError)
 				return
 			}
 			ret = append(ret, refData)
@@ -560,18 +559,18 @@ func RefDataPositions(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("RefDataPositions", ret)
+	api.Exit("RefDataPositions", ret)
 }
 
 func RefDataFocus(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("RefDataFocus", w, r)
+	api.Enter("RefDataFocus", w, r)
 
 	// Focus means watch list and open mergers
 	ret := []api.JsonRefData{}
 	projections := []api.JsonProjections{}
 	err := api.Projections(&projections)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -580,7 +579,7 @@ func RefDataFocus(w http.ResponseWriter, r *http.Request) {
 			refData := api.JsonRefData{}
 			err = api.RefDataByID(projections[i].RefDataID, &refData)
 			if err != nil {
-				cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+				api.ErrorHttp(err, w, http.StatusInternalServerError)
 				return
 			}
 			ret = append(ret, refData)
@@ -590,7 +589,7 @@ func RefDataFocus(w http.ResponseWriter, r *http.Request) {
 	mergers := []api.JsonEnrichedMerger{}
 	err = api.EnrichedMergersResearch(&mergers)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -599,7 +598,7 @@ func RefDataFocus(w http.ResponseWriter, r *http.Request) {
 			refData := api.JsonRefData{}
 			err = api.RefDataByID(mergers[i].TargetRefDataID, &refData)
 			if err != nil {
-				cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+				api.ErrorHttp(err, w, http.StatusInternalServerError)
 				return
 			}
 			ret = append(ret, refData)
@@ -608,15 +607,15 @@ func RefDataFocus(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("RefDataFocus", ret)
+	api.Exit("RefDataFocus", ret)
 }
 
 func RefData(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("RefData", w, r)
+	api.Enter("RefData", w, r)
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -624,23 +623,23 @@ func RefData(w http.ResponseWriter, r *http.Request) {
 	ret := []api.JsonRefData{}
 	err = db.Select(&ret, fmt.Sprintf("%s, market_data m WHERE r.active=true AND r.id = m.ref_data_id ORDER BY m.updated_at ASC", api.JsonToSelect(foo, "ref_data", "r")))
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("RefData", ret)
+	api.Exit("RefData", ret)
 }
 
 func RefDataByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("RefDataByID", w, r)
+	api.Enter("RefDataByID", w, r)
 
 	params := mux.Vars(r)
 	id := params["id"]
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -653,23 +652,23 @@ func RefDataByID(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("RefDataByID", ret)
+	api.Exit("RefDataByID", ret)
 }
 
 func RefDataBySymbol(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("RefDataBySymbol", w, r)
+	api.Enter("RefDataBySymbol", w, r)
 
-	args := new(cmn.RestSymbolInput)
+	args := new(api.RestSymbolInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -682,7 +681,7 @@ func RefDataBySymbol(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("RefDataBySymbol", ret)
+	api.Exit("RefDataBySymbol", ret)
 }
 
 type DbScalar struct {
@@ -699,19 +698,19 @@ type ScalarRet struct {
 }
 
 func Scalar(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Scalar", w, r)
+	api.Enter("Scalar", w, r)
 
 	args := new(ScalarInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -724,18 +723,18 @@ func Scalar(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(ScalarRet{Value: s.Value})
 
-	cmn.Exit("Scalar", s)
+	api.Exit("Scalar", s)
 }
 
 func SimfinIncomeByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("SimfinIncomeByID", w, r)
+	api.Enter("SimfinIncomeByID", w, r)
 
 	params := mux.Vars(r)
 	id := params["id"]
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -748,7 +747,7 @@ func SimfinIncomeByID(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("RefDataByID", ret)
+	api.Exit("RefDataByID", ret)
 }
 
 type SimfinIncomeInput struct {
@@ -756,20 +755,20 @@ type SimfinIncomeInput struct {
 }
 
 func SimfinIncomeByTicker(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("SimfinIncomeByTicker", w, r)
+	api.Enter("SimfinIncomeByTicker", w, r)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	args := new(SimfinIncomeInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -782,7 +781,7 @@ func SimfinIncomeByTicker(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("SimfinIncomeByTicker", ret)
+	api.Exit("SimfinIncomeByTicker", ret)
 }
 
 type IncomeInput struct {
@@ -790,14 +789,14 @@ type IncomeInput struct {
 }
 
 func IncomeByTicker(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("IncomeByTicker", w, r)
+	api.Enter("IncomeByTicker", w, r)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	args := new(IncomeInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
@@ -813,24 +812,24 @@ func IncomeByTicker(w http.ResponseWriter, r *http.Request) {
 	for s := range simfin {
 		i := api.JsonIncome{JsonSimfinIncome: simfin[s]}
 		if i.SharesDiluted > 0.0 {
-			i.EPS = cmn.Round(float64(i.NetIncomeCommon)/float64(i.SharesDiluted), 0.01)
+			i.EPS = api.Round(float64(i.NetIncomeCommon)/float64(i.SharesDiluted), 0.01)
 		}
 		ret = append(ret, i)
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("IncomeByTicker", ret)
+	api.Exit("IncomeByTicker", ret)
 }
 
 func SimfinBalanceByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("SimfinBalanceByID", w, r)
+	api.Enter("SimfinBalanceByID", w, r)
 
 	params := mux.Vars(r)
 	id := params["id"]
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -843,7 +842,7 @@ func SimfinBalanceByID(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("SimfinBalanceByID", ret)
+	api.Exit("SimfinBalanceByID", ret)
 }
 
 type SimfinBalanceInput struct {
@@ -851,20 +850,20 @@ type SimfinBalanceInput struct {
 }
 
 func SimfinBalanceByTicker(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("SimfinBalanceByTicker", w, r)
+	api.Enter("SimfinBalanceByTicker", w, r)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	args := new(SimfinBalanceInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -877,7 +876,7 @@ func SimfinBalanceByTicker(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("SimfinBalanceByTicker", ret)
+	api.Exit("SimfinBalanceByTicker", ret)
 }
 
 type BalanceInput struct {
@@ -885,14 +884,14 @@ type BalanceInput struct {
 }
 
 func BalanceByTicker(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("BalanceByTicker", w, r)
+	api.Enter("BalanceByTicker", w, r)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	args := new(BalanceInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
@@ -911,18 +910,18 @@ func BalanceByTicker(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("BalanceByTicker", ret)
+	api.Exit("BalanceByTicker", ret)
 }
 
 func SimfinCashflowByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("SimfinCashflowByID", w, r)
+	api.Enter("SimfinCashflowByID", w, r)
 
 	params := mux.Vars(r)
 	id := params["id"]
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -935,7 +934,7 @@ func SimfinCashflowByID(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("SimfinCashflowByID", ret)
+	api.Exit("SimfinCashflowByID", ret)
 }
 
 type SimfinCashflowInput struct {
@@ -943,20 +942,20 @@ type SimfinCashflowInput struct {
 }
 
 func SimfinCashflowByTicker(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("SimfinCashflowByTicker", w, r)
+	api.Enter("SimfinCashflowByTicker", w, r)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	args := new(SimfinCashflowInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -969,7 +968,7 @@ func SimfinCashflowByTicker(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("SimfinCashflowByTicker", ret)
+	api.Exit("SimfinCashflowByTicker", ret)
 }
 
 type CashflowInput struct {
@@ -977,14 +976,14 @@ type CashflowInput struct {
 }
 
 func CashflowByTicker(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("CashflowByTicker", w, r)
+	api.Enter("CashflowByTicker", w, r)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	args := new(CashflowInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
@@ -1000,24 +999,24 @@ func CashflowByTicker(w http.ResponseWriter, r *http.Request) {
 	for s := range simfin {
 		i := api.JsonCashflow{JsonSimfinCashflow: simfin[s]}
 		if i.SharesBasic > 0.0 {
-			i.DPS = -1.0 * cmn.Round(float64(i.DividendsPaid)/float64(i.SharesBasic), 0.01)
+			i.DPS = -1.0 * api.Round(float64(i.DividendsPaid)/float64(i.SharesBasic), 0.01)
 		}
 		ret = append(ret, i)
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("CashflowByTicker", ret)
+	api.Exit("CashflowByTicker", ret)
 }
 
 func SummaryByTicker(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-SummaryByTicker", w, r)
+	api.Enter("Read-SummaryByTicker", w, r)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	args := new(cmn.RestTickerInput)
+	args := new(api.RestTickerInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
@@ -1090,18 +1089,18 @@ func SummaryByTicker(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-SummaryByTicker", ret)
+	api.Exit("Read-SummaryByTicker", ret)
 }
 
 func FactorsByTicker(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-FactorsByTicker", w, r)
+	api.Enter("Read-FactorsByTicker", w, r)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	args := new(cmn.RestTickerInput)
+	args := new(api.RestTickerInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
@@ -1122,18 +1121,18 @@ func FactorsByTicker(w http.ResponseWriter, r *http.Request) {
 		f.SharesDiluted = income[i].SharesDiluted
 		f.EPS = income[i].EPS
 		if i > 0 {
-			f.RevenueGrowth = cmn.Round(float64(income[0].Revenue)/float64(f.Revenue), 0.0001) - 1.0
+			f.RevenueGrowth = api.Round(float64(income[0].Revenue)/float64(f.Revenue), 0.0001) - 1.0
 			f.RevenueCagr = math.Pow(f.RevenueGrowth+1.0, 1.0/float64(i)) - 1.0
-			f.SharesDilutedGrowth = cmn.Round(float64(f.SharesDiluted)/float64(income[0].SharesDiluted), 0.0001) - 1.0
+			f.SharesDilutedGrowth = api.Round(float64(f.SharesDiluted)/float64(income[0].SharesDiluted), 0.0001) - 1.0
 			f.SharesDilutedCagr = math.Pow(f.SharesDilutedGrowth+1.0, 1.0/float64(i)) - 1.0
-			f.EPSGrowth = cmn.Round(float64(income[0].EPS)/float64(f.EPS), 0.0001) - 1.0
+			f.EPSGrowth = api.Round(float64(income[0].EPS)/float64(f.EPS), 0.0001) - 1.0
 			f.EPSCagr = math.Pow(f.EPSGrowth+1.0, 1.0/float64(i)) - 1.0
 		}
 		ret = append(ret, f)
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-FactorsByTicker", ret)
+	api.Exit("Read-FactorsByTicker", ret)
 }
 
 func Mergers(w http.ResponseWriter, r *http.Request) {
@@ -1161,47 +1160,47 @@ func Transactions(w http.ResponseWriter, r *http.Request) {
 }
 
 func TransactionsByPositionID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-TransactionsByPositionID", w, r)
+	api.Enter("Read-TransactionsByPositionID", w, r)
 
-	args := new(cmn.RestPositionIDInput)
+	args := new(api.RestPositionIDInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
 	ret := []api.JsonTransaction{}
-	err = cmn.DbSelect(&ret, api.JsonToSelect(api.JsonTransaction{}, fmt.Sprintf("transactions WHERE position_id=%d ORDER BY date DESC, id DESC", args.PositionID), ""))
+	err = api.DbSelect(&ret, api.JsonToSelect(api.JsonTransaction{}, fmt.Sprintf("transactions WHERE position_id=%d ORDER BY date DESC, id DESC", args.PositionID), ""))
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-TransactionsByPositionID", ret)
+	api.Exit("Read-TransactionsByPositionID", ret)
 }
 
 func TransactionsByPortfolioID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-TransactionsByPortfolioID", w, r)
+	api.Enter("Read-TransactionsByPortfolioID", w, r)
 
-	args := new(cmn.RestPortfolioIDInput)
+	args := new(api.RestPortfolioIDInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
 	ret := []api.JsonTransaction{}
-	err = cmn.DbSelect(&ret, api.JsonToSelect(api.JsonTransaction{}, fmt.Sprintf("transactions WHERE portfolio_id=%d and position_id=0 ORDER BY date DESC, id DESC", args.PortfolioID), ""))
+	err = api.DbSelect(&ret, api.JsonToSelect(api.JsonTransaction{}, fmt.Sprintf("transactions WHERE portfolio_id=%d and position_id=0 ORDER BY date DESC, id DESC", args.PortfolioID), ""))
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-TransactionsByPortfolioID", ret)
+	api.Exit("Read-TransactionsByPortfolioID", ret)
 }
 
 func PortfoliosByID(w http.ResponseWriter, r *http.Request) {
@@ -1213,28 +1212,28 @@ func EnrichPortfolio(p api.JsonPortfolio) (api.JsonEnrichedPortfolio, error) {
 	ep := api.JsonEnrichedPortfolio{JsonPortfolio: p}
 
 	var totalPortfolio api.JsonPortfolio
-	err := api.PortfoliosByID(cmn.CONST_PORTFOLIO_TOTAL, &totalPortfolio)
+	err := api.PortfoliosByID(api.CONST_PORTFOLIO_TOTAL, &totalPortfolio)
 	if err != nil {
 		return ep, err
 	}
 	if totalPortfolio.Value > 0 {
-		ep.PercentTotal = cmn.Round(p.Value/totalPortfolio.Value, 0.0001)
+		ep.PercentTotal = api.Round(p.Value/totalPortfolio.Value, 0.0001)
 	}
 	if p.Value > 0 {
-		ep.PercentCash = cmn.Round(p.Cash/p.Value, 0.0001)
-		ep.PercentDebt = cmn.Round(p.Debt/p.Value, 0.0001)
+		ep.PercentCash = api.Round(p.Cash/p.Value, 0.0001)
+		ep.PercentDebt = api.Round(p.Debt/p.Value, 0.0001)
 	}
 
 	return ep, nil
 }
 
 func EnrichedPortfolios(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-EnrichedPortfolios", w, r)
+	api.Enter("Read-EnrichedPortfolios", w, r)
 
 	var portfolios []api.JsonPortfolio
 	err := api.Portfolios(&portfolios)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -1242,7 +1241,7 @@ func EnrichedPortfolios(w http.ResponseWriter, r *http.Request) {
 	for i := range portfolios {
 		ep, err := EnrichPortfolio(portfolios[i])
 		if err != nil {
-			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+			api.ErrorHttp(err, w, http.StatusInternalServerError)
 			return
 		}
 
@@ -1250,50 +1249,50 @@ func EnrichedPortfolios(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-EnrichedPortfolios", ret)
+	api.Exit("Read-EnrichedPortfolios", ret)
 }
 
 func EnrichedPortfoliosByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-EnrichedPortfoliosByID", w, r)
+	api.Enter("Read-EnrichedPortfoliosByID", w, r)
 
 	params := mux.Vars(r)
 	id, err := strconv.Atoi(params["id"])
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	var portfolio api.JsonPortfolio
 	err = api.PortfoliosByID(id, &portfolio)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	ret, err := EnrichPortfolio(portfolio)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-EnrichedPortfoliosByID", ret)
+	api.Exit("Read-EnrichedPortfoliosByID", ret)
 }
 
 func PortfoliosHistoryByDate(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-PortfoliosHistoryByDate", w, r)
+	api.Enter("Read-PortfoliosHistoryByDate", w, r)
 
-	args := new(cmn.RestDateInput)
+	args := new(api.RestDateInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -1302,7 +1301,7 @@ func PortfoliosHistoryByDate(w http.ResponseWriter, r *http.Request) {
 		fmt.Sprintf("portfolios_history WHERE date=(select max(date) from portfolios_history where date <= '%s' and value > 0)", args.Date),
 		""))
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -1311,23 +1310,23 @@ func PortfoliosHistoryByDate(w http.ResponseWriter, r *http.Request) {
 	})
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-PortfoliosHistoryByDate", ret)
+	api.Exit("Read-PortfoliosHistoryByDate", ret)
 }
 
 func PortfoliosHistoryByPortfolioIDDate(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-PortfoliosHistoryByPortfolioIDDate", w, r)
+	api.Enter("Read-PortfoliosHistoryByPortfolioIDDate", w, r)
 
-	args := new(cmn.RestPortfolioIDDateInput)
+	args := new(api.RestPortfolioIDDateInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -1336,28 +1335,28 @@ func PortfoliosHistoryByPortfolioIDDate(w http.ResponseWriter, r *http.Request) 
 		fmt.Sprintf("portfolios_history WHERE portfolio_id=%d and date=(select max(date) from portfolios_history where date <= '%s' and value > 0)", args.PortfolioID, args.Date),
 		""))
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-PortfoliosHistoryByPortfolioIDDate", ret)
+	api.Exit("Read-PortfoliosHistoryByPortfolioIDDate", ret)
 }
 
 func PortfoliosHistoryMaxIndexByPortfolioID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-PortfoliosHistoryMaxIndexByPortfolioID", w, r)
+	api.Enter("Read-PortfoliosHistoryMaxIndexByPortfolioID", w, r)
 
-	args := new(cmn.RestPortfolioIDInput)
+	args := new(api.RestPortfolioIDInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -1366,50 +1365,50 @@ func PortfoliosHistoryMaxIndexByPortfolioID(w http.ResponseWriter, r *http.Reque
 		fmt.Sprintf("portfolios_history WHERE portfolio_id=%d and index=(select max(index) from portfolios_history where portfolio_id=%d)", args.PortfolioID, args.PortfolioID),
 		""))
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-PortfoliosHistoryMaxIndexByPortfolioID", ret)
+	api.Exit("Read-PortfoliosHistoryMaxIndexByPortfolioID", ret)
 }
 
 func PositionsHistoryFirst(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-PositionsHistoryFirst", w, r)
+	api.Enter("Read-PositionsHistoryFirst", w, r)
 
-	args := new(cmn.RestPositionIDInput)
+	args := new(api.RestPositionIDInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
 	ret := api.JsonPositionHistory{}
-	err = cmn.DbGet(&ret, api.JsonToSelect(api.JsonPositionHistory{}, fmt.Sprintf("positions_history WHERE position_id=%d and date=(select min(date) from positions_history where position_id=%d)", args.PositionID, args.PositionID), ""))
+	err = api.DbGet(&ret, api.JsonToSelect(api.JsonPositionHistory{}, fmt.Sprintf("positions_history WHERE position_id=%d and date=(select min(date) from positions_history where position_id=%d)", args.PositionID, args.PositionID), ""))
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-PositionsHistoryFirst", ret)
+	api.Exit("Read-PositionsHistoryFirst", ret)
 }
 
 func PositionsHistoryByPortfolioIDDate(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-PositionsHistoryByPortfolioIDDate", w, r)
+	api.Enter("Read-PositionsHistoryByPortfolioIDDate", w, r)
 
-	args := new(cmn.RestPortfolioIDDateInput)
+	args := new(api.RestPortfolioIDDateInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -1418,28 +1417,28 @@ func PositionsHistoryByPortfolioIDDate(w http.ResponseWriter, r *http.Request) {
 		fmt.Sprintf("positions_history WHERE portfolio_id=%d and date=(select max(date) from positions_history where date <= '%s')", args.PortfolioID, args.Date),
 		""))
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-PositionsHistoryByPortfolioIDDate", ret)
+	api.Exit("Read-PositionsHistoryByPortfolioIDDate", ret)
 }
 
 func PositionsHistoryByPositionIDDate(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-PositionsHistoryByPositionIDDate", w, r)
+	api.Enter("Read-PositionsHistoryByPositionIDDate", w, r)
 
-	args := new(cmn.RestPositionIDDateInput)
+	args := new(api.RestPositionIDDateInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -1448,32 +1447,32 @@ func PositionsHistoryByPositionIDDate(w http.ResponseWriter, r *http.Request) {
 		fmt.Sprintf("positions_history WHERE position_id=%d and date=(select max(date) from positions_history where date <= '%s')", args.PositionID, args.Date),
 		""))
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-PositionsHistoryByPositionIDDate", ret)
+	api.Exit("Read-PositionsHistoryByPositionIDDate", ret)
 }
 
 func PortfoliosHistoryMaxDate(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-PortfoliosHistoryMaxDate", w, r)
+	api.Enter("Read-PortfoliosHistoryMaxDate", w, r)
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
-	ret := cmn.RestStringOutput{}
+	ret := api.RestStringOutput{}
 	err = db.Get(&ret, "select max(date) as value from portfolios_history")
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-PortfoliosHistoryMaxDate", ret)
+	api.Exit("Read-PortfoliosHistoryMaxDate", ret)
 }
 
 func Positions(w http.ResponseWriter, r *http.Request) {
@@ -1483,38 +1482,38 @@ func Positions(w http.ResponseWriter, r *http.Request) {
 }
 
 func PositionsBySymbolPortfolioID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-PositionsBySymbolPortfolioID", w, r)
+	api.Enter("Read-PositionsBySymbolPortfolioID", w, r)
 
-	args := new(cmn.RestSymbolPortfolioIDInput)
+	args := new(api.RestSymbolPortfolioIDInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
 	var refData api.JsonRefData
 	err = api.RefDataBySymbol(args.Symbol, &refData)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	ret := api.JsonPosition{}
 	err = db.Get(&ret, api.JsonToSelect(api.JsonPosition{}, fmt.Sprintf("positions WHERE ref_data_id=%d and portfolio_id=%d", refData.ID, args.PortfolioID), ""))
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-PositionsBySymbolPortfolioID", ret)
+	api.Exit("Read-PositionsBySymbolPortfolioID", ret)
 }
 
 func CalculateReturn(table string, idCol string, id int, index float64, date string, interval string, years float64) float64 {
@@ -1523,9 +1522,9 @@ func CalculateReturn(table string, idCol string, id int, index float64, date str
 	query := "select index from %s where %s=%d and date=" +
 		"(select max(date) from %s where %s=%d and date <= (select date('%s') - interval '%s'))"
 	// If the value is not present, leave the return zero, don't handle error
-	_ = cmn.DbGet(&start, fmt.Sprintf(query, table, idCol, id, table, idCol, id, date, interval))
+	_ = api.DbGet(&start, fmt.Sprintf(query, table, idCol, id, table, idCol, id, date, interval))
 	if start > 0 {
-		ret = cmn.Round(math.Pow(index/start, 1/years)-1, 0.0001)
+		ret = api.Round(math.Pow(index/start, 1/years)-1, 0.0001)
 		log.Printf("CalculateReturn: start: %f, ret: %f", start, ret)
 	}
 	return ret
@@ -1566,7 +1565,7 @@ func EnrichYTDPortfolioReturns(r *api.JsonReturns, value float64, index float64,
 	}
 
 	if physd.Index > 0 {
-		r.YearToDate = cmn.Round(index/physd.Index-1, 0.0001)
+		r.YearToDate = api.Round(index/physd.Index-1, 0.0001)
 	}
 	r.ProfitYearToDate = value - physd.Value - (tci - physd.TotalCashInfusion)
 	return nil
@@ -1592,26 +1591,26 @@ func EnrichYTDPositionReturns(r *api.JsonReturns, value float64, index float64, 
 	}
 
 	if physd.Index > 0 {
-		r.YearToDate = cmn.Round(index/physd.Index-1, 0.0001)
+		r.YearToDate = api.Round(index/physd.Index-1, 0.0001)
 	}
 	r.ProfitYearToDate = value - physd.Value - (tci - physd.TotalCashInfusion) + (divs - physd.AccumulatedDividends)
 	return nil
 }
 
 func PortfolioReturnsByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-PortfolioReturnsByID", w, r)
+	api.Enter("Read-PortfolioReturnsByID", w, r)
 
 	params := mux.Vars(r)
 	id, err := strconv.Atoi(params["id"])
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	var portfolio api.JsonPortfolio
 	err = api.PortfoliosByID(id, &portfolio)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -1619,20 +1618,20 @@ func PortfolioReturnsByID(w http.ResponseWriter, r *http.Request) {
 		0, time.Now().Format("2006-01-02"))
 	err = EnrichYTDPortfolioReturns(&ret, portfolio.Value, portfolio.Index, portfolio.TotalCashInfusion, time.Now().Format("2006-01-02"))
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(&ret)
-	cmn.Exit("Read-PortfolioReturnsByID", ret)
+	api.Exit("Read-PortfolioReturnsByID", ret)
 }
 
 func PortfolioReturns(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-PortfolioReturns", w, r)
+	api.Enter("Read-PortfolioReturns", w, r)
 
 	var portfolios []api.JsonPortfolio
 	err := api.Portfolios(&portfolios)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -1642,7 +1641,7 @@ func PortfolioReturns(w http.ResponseWriter, r *http.Request) {
 			portfolios[i].TotalCashInfusion, 0, time.Now().Format("2006-01-02"))
 		err = EnrichYTDPortfolioReturns(&pr, portfolios[i].Value, portfolios[i].Index, portfolios[i].TotalCashInfusion, time.Now().Format("2006-01-02"))
 		if err != nil {
-			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+			api.ErrorHttp(err, w, http.StatusInternalServerError)
 			return
 		}
 
@@ -1650,24 +1649,24 @@ func PortfolioReturns(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-PortfolioReturns", ret)
+	api.Exit("Read-PortfolioReturns", ret)
 }
 
 func PortfolioReturnsByDate(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-PortfolioReturnsByDate", w, r)
+	api.Enter("Read-PortfolioReturnsByDate", w, r)
 
-	args := new(cmn.RestDateInput)
+	args := new(api.RestDateInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
 	var portfoliosHistory []api.JsonPortfolioHistory
 	err = api.PortfoliosHistoryByDate(args.Date, &portfoliosHistory)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -1679,7 +1678,7 @@ func PortfolioReturnsByDate(w http.ResponseWriter, r *http.Request) {
 			0, args.Date)
 		err = EnrichYTDPortfolioReturns(&pr, portfolio.Value, portfolio.Index, portfolio.TotalCashInfusion, args.Date)
 		if err != nil {
-			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+			api.ErrorHttp(err, w, http.StatusInternalServerError)
 			return
 		}
 
@@ -1687,35 +1686,35 @@ func PortfolioReturnsByDate(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-PortfolioReturnsByDate", ret)
+	api.Exit("Read-PortfolioReturnsByDate", ret)
 }
 
 func PositionReturnsByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-PositionReturnsByID", w, r)
+	api.Enter("Read-PositionReturnsByID", w, r)
 
 	params := mux.Vars(r)
 	id, err := strconv.Atoi(params["id"])
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	var ep api.JsonEnrichedPosition
 	err = api.EnrichedPositionsByID(id, &ep)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	ret := EnrichReturns("positions_history", "position_id", ep.ID, ep.Symbol, ep.Value, ep.Index, ep.TotalCashInfusion, ep.AccumulatedDividends, time.Now().Format("2006-01-02"))
 	err = EnrichYTDPositionReturns(&ret, ep.Value, ep.Index, ep.TotalCashInfusion, ep.AccumulatedDividends, time.Now().Format("2006-01-02"))
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	json.NewEncoder(w).Encode(&ret)
-	cmn.Exit("Read-PositionReturnsByID", ret)
+	api.Exit("Read-PositionReturnsByID", ret)
 }
 
 func EnrichPosition(p api.JsonPosition) (api.JsonEnrichedPosition, error) {
@@ -1735,19 +1734,19 @@ func EnrichPosition(p api.JsonPosition) (api.JsonEnrichedPosition, error) {
 		return ep, err
 	}
 	if ep.Active && portfolio.Value > 0 {
-		ep.PercentPortfolio = cmn.Round(p.Value/portfolio.Value, 0.0001)
+		ep.PercentPortfolio = api.Round(p.Value/portfolio.Value, 0.0001)
 	}
 
 	return ep, nil
 }
 
 func EnrichedPositionsAll(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-EnrichedPositionsAll", w, r)
+	api.Enter("Read-EnrichedPositionsAll", w, r)
 
 	var positions []api.JsonPosition
-	err := cmn.DbSelect(&positions, api.JsonToSelect(api.JsonPosition{}, "positions ORDER BY id ASC", ""))
+	err := api.DbSelect(&positions, api.JsonToSelect(api.JsonPosition{}, "positions ORDER BY id ASC", ""))
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -1755,7 +1754,7 @@ func EnrichedPositionsAll(w http.ResponseWriter, r *http.Request) {
 	for i := range positions {
 		ep, err := EnrichPosition(positions[i])
 		if err != nil {
-			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+			api.ErrorHttp(err, w, http.StatusInternalServerError)
 			return
 		}
 
@@ -1763,7 +1762,7 @@ func EnrichedPositionsAll(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-EnrichedPositionsAll", ret)
+	api.Exit("Read-EnrichedPositionsAll", ret)
 }
 
 type EnrichedPositionsByPortfolioIDInput struct {
@@ -1779,32 +1778,32 @@ func EnrichedPositionsAllByPortfolioID(w http.ResponseWriter, r *http.Request) {
 }
 
 func EnrichedPositionsByPortfolioIDInternal(w http.ResponseWriter, r *http.Request, filter string) {
-	cmn.Enter("Read-EnrichedPositionsByPortfolioID", w, r)
+	api.Enter("Read-EnrichedPositionsByPortfolioID", w, r)
 	args := new(EnrichedPositionsByPortfolioIDInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	positions := []api.JsonPosition{}
 	err = db.Select(&positions, api.JsonToSelect(api.JsonPosition{}, "positions", "")+fmt.Sprintf(" WHERE portfolio_id=%d %s ORDER BY id DESC", args.PortfolioID, filter))
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	ret := []api.JsonEnrichedPosition{}
 	for i := range positions {
 		ep, err := EnrichPosition(positions[i])
 		if err != nil {
-			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+			api.ErrorHttp(err, w, http.StatusInternalServerError)
 			return
 		}
 
@@ -1816,58 +1815,58 @@ func EnrichedPositionsByPortfolioIDInternal(w http.ResponseWriter, r *http.Reque
 	})
 
 	json.NewEncoder(w).Encode(&ret)
-	cmn.Exit("Read-EnrichedPositionsByPortfolioID", ret)
+	api.Exit("Read-EnrichedPositionsByPortfolioID", ret)
 }
 
 func EnrichedPositionsBySymbolPortfolioID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-EnrichedPositionsBySymbolPortfolioID", w, r)
+	api.Enter("Read-EnrichedPositionsBySymbolPortfolioID", w, r)
 
-	args := new(cmn.RestSymbolPortfolioIDInput)
+	args := new(api.RestSymbolPortfolioIDInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
 	var p api.JsonPosition
 	err = api.PositionsBySymbolPortfolioID(args.Symbol, args.PortfolioID, &p)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 	ret, err := EnrichPosition(p)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-EnrichedPositionsBySymbolPortfolioID", ret)
+	api.Exit("Read-EnrichedPositionsBySymbolPortfolioID", ret)
 }
 
 func EnrichedPositionsHistoryByPortfolioIDDate(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-EnrichedPositionsHistoryByPortfolioIDDate", w, r)
+	api.Enter("Read-EnrichedPositionsHistoryByPortfolioIDDate", w, r)
 
-	args := new(cmn.RestPortfolioIDDateInput)
+	args := new(api.RestPortfolioIDDateInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
 	positions := []api.JsonPositionHistory{}
 	err = api.PositionsHistoryByPortfolioIDDate(args.PortfolioID, args.Date, &positions)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	ret := []api.JsonEnrichedPositionHistory{}
 	for i := range positions {
 		ep, err := EnrichPosition(positions[i].JsonPosition)
 		if err != nil {
-			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+			api.ErrorHttp(err, w, http.StatusInternalServerError)
 			return
 		}
 		eph := api.JsonEnrichedPositionHistory{JsonEnrichedPosition: ep}
@@ -1882,7 +1881,7 @@ func EnrichedPositionsHistoryByPortfolioIDDate(w http.ResponseWriter, r *http.Re
 	})
 
 	json.NewEncoder(w).Encode(&ret)
-	cmn.Exit("Read-EnrichedPositionsHistoryByPortfolioIDDate", ret)
+	api.Exit("Read-EnrichedPositionsHistoryByPortfolioIDDate", ret)
 }
 
 func EnrichMerger(m api.JsonMerger) (api.JsonEnrichedMerger, error) {
@@ -1909,8 +1908,8 @@ func EnrichMerger(m api.JsonMerger) (api.JsonEnrichedMerger, error) {
 	}
 	em.Price = md.Last
 
-	closeTime := cmn.DateStringToTime(em.CloseDate)
-	strikeTime := cmn.DateStringToTime(em.AnnounceDate)
+	closeTime := api.DateStringToTime(em.CloseDate)
+	strikeTime := api.DateStringToTime(em.AnnounceDate)
 	daysToClose := closeTime.Sub(time.Now()).Hours() / 24
 	fees := 0.005
 	if strings.Contains(em.TargetTicker, ".HK") {
@@ -1919,38 +1918,38 @@ func EnrichMerger(m api.JsonMerger) (api.JsonEnrichedMerger, error) {
 	if em.BreakPrice > 0 {
 		em.Status = "B"
 		if em.StrikePrice > 0 {
-			em.StrikeReturn = cmn.Round((em.BreakPrice+em.Cash-fees)/em.StrikePrice-1, 0.0001)
+			em.StrikeReturn = api.Round((em.BreakPrice+em.Cash-fees)/em.StrikePrice-1, 0.0001)
 			daysFromStrike := closeTime.Sub(strikeTime).Hours() / 24
-			em.StrikeReturnAnnualized = cmn.Round((365/daysFromStrike)*em.StrikeReturn, 0.0001)
+			em.StrikeReturnAnnualized = api.Round((365/daysFromStrike)*em.StrikeReturn, 0.0001)
 		}
 	} else if daysToClose < 0 {
 		em.Status = "C"
 		if em.StrikePrice > 0 {
-			em.StrikeReturn = cmn.Round((em.DealPrice+em.Cash-fees)/em.StrikePrice-1, 0.0001)
+			em.StrikeReturn = api.Round((em.DealPrice+em.Cash-fees)/em.StrikePrice-1, 0.0001)
 			daysFromStrike := closeTime.Sub(strikeTime).Hours() / 24
-			em.StrikeReturnAnnualized = cmn.Round((365/daysFromStrike)*em.StrikeReturn, 0.0001)
+			em.StrikeReturnAnnualized = api.Round((365/daysFromStrike)*em.StrikeReturn, 0.0001)
 		}
 	} else {
 		em.Status = "O"
 		if em.StrikePrice > 0 {
-			em.StrikeReturn = cmn.Round((md.Last+em.Cash-fees)/em.StrikePrice-1, 0.0001)
+			em.StrikeReturn = api.Round((md.Last+em.Cash-fees)/em.StrikePrice-1, 0.0001)
 			daysFromStrike := time.Now().Sub(strikeTime).Hours() / 24
-			em.StrikeReturnAnnualized = cmn.Round((365/daysFromStrike)*em.StrikeReturn, 0.0001)
+			em.StrikeReturnAnnualized = api.Round((365/daysFromStrike)*em.StrikeReturn, 0.0001)
 		}
-		em.MarketPositiveReturn = cmn.Round((em.DealPrice+em.Dividends-fees)/md.Last-1, 0.0001)
-		em.MarketNetReturn = cmn.Round(
+		em.MarketPositiveReturn = api.Round((em.DealPrice+em.Dividends-fees)/md.Last-1, 0.0001)
+		em.MarketNetReturn = api.Round(
 			((em.DealPrice+em.Dividends-fees-md.Last)*em.Confidence-(md.Last-em.FailPrice-em.Dividends+2*fees)*(1-em.Confidence))/md.Last, 0.0001)
 		annualizeMultiple := 365 / daysToClose
-		em.MarketPositiveReturnAnnualized = cmn.Round(annualizeMultiple*em.MarketPositiveReturn, 0.0001)
-		em.MarketNetReturnAnnualized = cmn.Round(annualizeMultiple*em.MarketNetReturn, 0.0001)
+		em.MarketPositiveReturnAnnualized = api.Round(annualizeMultiple*em.MarketPositiveReturn, 0.0001)
+		em.MarketNetReturnAnnualized = api.Round(annualizeMultiple*em.MarketNetReturn, 0.0001)
 	}
 
 	var position api.JsonEnrichedPosition
-	err = api.EnrichedPositionsBySymbolPortfolioID(em.TargetTicker, cmn.CONST_PORTFOLIO_RISK_ARB, &position)
+	err = api.EnrichedPositionsBySymbolPortfolioID(em.TargetTicker, api.CONST_PORTFOLIO_RISK_ARB, &position)
 	// Don't pass the error up, it's ok if this isn't a position, we just populate zero
 	if err == nil {
 		em.PercentPortfolio = position.PercentPortfolio
-		em.PositionReturn = cmn.Round(position.Index/100.0-1, 0.0001)
+		em.PositionReturn = api.Round(position.Index/100.0-1, 0.0001)
 	}
 
 	var returns api.JsonReturns
@@ -1964,13 +1963,13 @@ func EnrichMerger(m api.JsonMerger) (api.JsonEnrichedMerger, error) {
 }
 
 func EnrichedMergersPositions(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-EnrichedMergersPositions", w, r)
+	api.Enter("Read-EnrichedMergersPositions", w, r)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	var mergers []api.JsonMerger
 	err := api.Mergers(&mergers)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -1978,7 +1977,7 @@ func EnrichedMergersPositions(w http.ResponseWriter, r *http.Request) {
 	for i := range mergers {
 		em, err := EnrichMerger(mergers[i])
 		if err != nil {
-			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+			api.ErrorHttp(err, w, http.StatusInternalServerError)
 			return
 		}
 
@@ -1991,17 +1990,17 @@ func EnrichedMergersPositions(w http.ResponseWriter, r *http.Request) {
 	})
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-EnrichedMergersPositions", ret)
+	api.Exit("Read-EnrichedMergersPositions", ret)
 }
 
 func EnrichedMergersPositionsTotal(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-EnrichedMergersPositionsTotal", w, r)
+	api.Enter("Read-EnrichedMergersPositionsTotal", w, r)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	var mergers []api.JsonEnrichedMerger
 	err := api.EnrichedMergersPositions(&mergers)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -2018,17 +2017,17 @@ func EnrichedMergersPositionsTotal(w http.ResponseWriter, r *http.Request) {
 	ret = append(ret, total)
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-EnrichedMergersPositionsTotal", ret)
+	api.Exit("Read-EnrichedMergersPositionsTotal", ret)
 }
 
 func EnrichedMergersResearch(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-EnrichedMergersResearch", w, r)
+	api.Enter("Read-EnrichedMergersResearch", w, r)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	var mergers []api.JsonMerger
 	err := api.Mergers(&mergers)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -2036,7 +2035,7 @@ func EnrichedMergersResearch(w http.ResponseWriter, r *http.Request) {
 	for i := range mergers {
 		em, err := EnrichMerger(mergers[i])
 		if err != nil {
-			cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+			api.ErrorHttp(err, w, http.StatusInternalServerError)
 			return
 		}
 
@@ -2056,18 +2055,18 @@ func EnrichedMergersResearch(w http.ResponseWriter, r *http.Request) {
 	})
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-EnrichedMergersResearch", ret)
+	api.Exit("Read-EnrichedMergersResearch", ret)
 }
 
 func EnrichedMergersByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-EnrichedMergersByID", w, r)
+	api.Enter("Read-EnrichedMergersByID", w, r)
 
 	params := mux.Vars(r)
 	id := params["id"]
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -2080,40 +2079,40 @@ func EnrichedMergersByID(w http.ResponseWriter, r *http.Request) {
 	}
 	em, err := EnrichMerger(m)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	json.NewEncoder(w).Encode(&em)
 
-	cmn.Exit("Read-EnrichedMergersByID", em)
+	api.Exit("Read-EnrichedMergersByID", em)
 }
 
 func EnrichedPositionsByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-EnrichedPositionsByID", w, r)
+	api.Enter("Read-EnrichedPositionsByID", w, r)
 
 	params := mux.Vars(r)
 	id, err := strconv.Atoi(params["id"])
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	p := api.JsonPosition{}
 	err = api.PositionsByID(id, &p)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	ep, err := EnrichPosition(p)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	json.NewEncoder(w).Encode(&ep)
 
-	cmn.Exit("Read-EnrichedPositionsByID", ep)
+	api.Exit("Read-EnrichedPositionsByID", ep)
 }
 
 type EnrichedMergersJournalByMergerIDInput struct {
@@ -2121,19 +2120,19 @@ type EnrichedMergersJournalByMergerIDInput struct {
 }
 
 func EnrichedMergersJournalByMergerID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Read-EnrichedMergersJournalByMergerID", w, r)
+	api.Enter("Read-EnrichedMergersJournalByMergerID", w, r)
 
 	args := new(EnrichedMergersJournalByMergerIDInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -2146,7 +2145,7 @@ func EnrichedMergersJournalByMergerID(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(&ret)
 
-	cmn.Exit("Read-EnrichedMergersJournalByMergerID", ret)
+	api.Exit("Read-EnrichedMergersJournalByMergerID", ret)
 }
 
 func main() {

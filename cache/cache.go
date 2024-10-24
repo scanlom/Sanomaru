@@ -11,33 +11,32 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/scanlom/Sanomaru/api"
-	"github.com/scanlom/Sanomaru/cmn"
 )
 
 const CONST_DIE_SIGNAL = -1
 
 // MSTODO: If there is any error I should know loud and clear
 // MSTODO: Try to do MDHSummary and other stuff from the api,
-// MSTODO: Will keep this named redis.go until I'm ready to delete the current cache.go, then will swap in
 // MSTODO: Should have alerting if a microservice isn't running
 // MSTODO: Clean up directory structure
 // MSTODO: Gateway should do minimal job, maybe only sort
+// MSTODO: When I update a projection, angular should update after redis cache updates
 
 func UpdateWorker(wg *sync.WaitGroup, list string, table string, ptr interface{}, obj interface{}, work func(interface{})) {
 	defer wg.Done()
 	for {
 		log.Printf("Blocking on %s...", list)
-		id := cmn.CacheBLPop(list)
+		id := api.CacheBLPop(list)
 		if id == CONST_DIE_SIGNAL {
 			break
 		}
-		err := cmn.DbGet(ptr, fmt.Sprintf("%s WHERE id=%d", api.JsonToSelect(obj, table, ""), id))
+		err := api.DbGet(ptr, fmt.Sprintf("%s WHERE id=%d", api.JsonToSelect(obj, table, ""), id))
 		if err != nil {
-			cmn.ErrorLog(err)
+			api.ErrorLog(err)
 			continue // Strange, but a record may have been deleted, and that's survivable
 		}
 
-		cmn.CacheSet(fmt.Sprintf("%s:%d", table, id), ptr)
+		api.CacheSet(fmt.Sprintf("%s:%d", table, id), ptr)
 		work(ptr)
 	}
 	log.Printf("UpdateWorker %s completed", list)
@@ -45,14 +44,14 @@ func UpdateWorker(wg *sync.WaitGroup, list string, table string, ptr interface{}
 
 func LoadUpdateIDList(table string) {
 	ret := []api.JsonID{}
-	err := cmn.DbSelect(&ret, api.JsonToSelect(api.JsonID{}, table, ""))
+	err := api.DbSelect(&ret, api.JsonToSelect(api.JsonID{}, table, ""))
 	if err != nil {
-		cmn.ErrorLog(err)
+		api.ErrorLog(err)
 		panic(err) // Can't survive a missing table
 	}
 
 	for i := range ret {
-		cmn.CacheLPush(fmt.Sprintf("%s_update", table), ret[i].ID)
+		api.CacheRPush(fmt.Sprintf("%s_update", table), ret[i].ID)
 	}
 }
 
@@ -63,11 +62,11 @@ func NotifyInsertUpdate(wg *sync.WaitGroup, listener *pq.Listener) {
 		extra := api.JsonTableID{}
 		err := json.Unmarshal([]byte(n.Extra), &extra)
 		if err != nil {
-			cmn.ErrorLog(err)
+			api.ErrorLog(err)
 			panic(err) // Why are we getting a bad update
 		}
 		log.Printf("Table %s, ID %d", extra.Table, extra.ID)
-		cmn.CacheLPush(fmt.Sprintf("%s_update", extra.Table), extra.ID)
+		api.CacheRPush(fmt.Sprintf("%s_update", extra.Table), extra.ID)
 	}
 	log.Printf("NotifyInsertUpdate complete")
 }
@@ -86,9 +85,9 @@ func WaitToDie() <-chan struct{} {
 
 func main() {
 	// Start clean
-	err := cmn.CacheFlushAll()
+	err := api.CacheFlushAll()
 	if err != nil {
-		cmn.ErrorLog(err)
+		api.ErrorLog(err)
 		panic(err) // Can't survive massive redis failure
 	}
 
@@ -96,9 +95,9 @@ func main() {
 	wg.Add(7)
 
 	// Listen for db inserts and updates
-	listener, err := cmn.DbListen("insert_update")
+	listener, err := api.DbListen("insert_update")
 	if err != nil {
-		cmn.ErrorLog(err)
+		api.ErrorLog(err)
 		panic(err) // Can't survive massive postgres failure
 	}
 	go NotifyInsertUpdate(&wg, listener)
@@ -131,14 +130,15 @@ func main() {
 	log.Print("Shutdown...")
 	err = listener.Close()
 	if err != nil {
-		cmn.ErrorLog(err)
+		api.ErrorLog(err)
 	}
-	cmn.CacheLPush("ref_data_update", CONST_DIE_SIGNAL)
-	cmn.CacheLPush("market_data_update", CONST_DIE_SIGNAL)
-	cmn.CacheLPush("portfolios_update", CONST_DIE_SIGNAL)
-	cmn.CacheLPush("positions_update", CONST_DIE_SIGNAL)
-	cmn.CacheLPush("mergers_update", CONST_DIE_SIGNAL)
+	api.CacheLPush("ref_data_update", CONST_DIE_SIGNAL)
+	api.CacheLPush("market_data_update", CONST_DIE_SIGNAL)
+	api.CacheLPush("portfolios_update", CONST_DIE_SIGNAL)
+	api.CacheLPush("positions_update", CONST_DIE_SIGNAL)
+	api.CacheLPush("projections_update", CONST_DIE_SIGNAL)
+	api.CacheLPush("mergers_update", CONST_DIE_SIGNAL)
 	wg.Wait()
-	cmn.CacheClose()
+	api.CacheClose()
 	log.Print("Shutdown complete")
 }

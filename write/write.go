@@ -9,7 +9,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/schema"
 	"github.com/scanlom/Sanomaru/api"
-	"github.com/scanlom/Sanomaru/cmn"
 )
 
 func setupRouter(router *mux.Router) {
@@ -49,90 +48,90 @@ func setupRouter(router *mux.Router) {
 }
 
 func RestHandlePost(w http.ResponseWriter, r *http.Request, msg string, ptr interface{}, obj interface{}, table string) {
-	cmn.Enter(msg, w, r)
+	api.Enter(msg, w, r)
 
 	err := json.NewDecoder(r.Body).Decode(ptr)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
-	err = cmn.DbNamedExec(api.JsonToNamedInsert(obj, table), ptr)
+	err = api.DbNamedExec(api.JsonToNamedInsert(obj, table), ptr)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	json.NewEncoder(w).Encode(ptr)
-	cmn.Exit(msg, ptr)
+	api.Exit(msg, ptr)
 }
 
 func RestHandlePut(w http.ResponseWriter, r *http.Request, msg string, ptr interface{}, obj interface{}, table string) {
-	cmn.Enter(msg, w, r)
+	api.Enter(msg, w, r)
 
 	params := mux.Vars(r)
 	id := params["id"]
 	err := json.NewDecoder(r.Body).Decode(ptr)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
-	err = cmn.DbNamedExec(fmt.Sprintf("%s WHERE id=%s", api.JsonToNamedUpdate(obj, table), id), ptr)
+	err = api.DbNamedExec(fmt.Sprintf("%s WHERE id=%s", api.JsonToNamedUpdate(obj, table), id), ptr)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	json.NewEncoder(w).Encode(ptr)
-	cmn.Exit(msg, ptr)
+	api.Exit(msg, ptr)
 }
 
 func RestHandleDelete(w http.ResponseWriter, r *http.Request, msg string, table string) {
-	cmn.Enter(msg, w, r)
+	api.Enter(msg, w, r)
 
 	params := mux.Vars(r)
 	id := params["id"]
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	_, err = db.Exec(fmt.Sprintf("DELETE FROM %s where id=%s", table, id))
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	cmn.Exit(msg, http.StatusOK)
+	api.Exit(msg, http.StatusOK)
 }
 
 func RestHandleDeleteByDate(w http.ResponseWriter, r *http.Request, msg string, table string) {
-	cmn.Enter(msg, w, r)
+	api.Enter(msg, w, r)
 
-	args := new(cmn.RestDateInput)
+	args := new(api.RestDateInput)
 	decoder := schema.NewDecoder()
 	err := decoder.Decode(args, r.URL.Query())
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusBadRequest)
+		api.ErrorHttp(err, w, http.StatusBadRequest)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	_, err = db.Exec(fmt.Sprintf("DELETE FROM %s where date='%s'", table, args.Date))
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	cmn.Exit(msg, http.StatusOK)
+	api.Exit(msg, http.StatusOK)
 }
 
 func MarketData(w http.ResponseWriter, r *http.Request) {
@@ -141,7 +140,7 @@ func MarketData(w http.ResponseWriter, r *http.Request) {
 }
 
 func MarketDataByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("MarketDataByID", w, r)
+	api.Enter("MarketDataByID", w, r)
 
 	params := mux.Vars(r)
 	id := params["id"]
@@ -149,23 +148,23 @@ func MarketDataByID(w http.ResponseWriter, r *http.Request) {
 	var ret api.JsonMarketData
 	err := json.NewDecoder(r.Body).Decode(&ret)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	_, err = db.Exec("UPDATE market_data SET last=$1 WHERE id=$2", ret.Last, id)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(ret)
-	cmn.Exit("MarketDataByID", ret)
+	api.Exit("MarketDataByID", ret)
 }
 
 func MarketDataHistorical(w http.ResponseWriter, r *http.Request) {
@@ -201,18 +200,19 @@ func TransactionsByID(w http.ResponseWriter, r *http.Request) {
 func Projections(w http.ResponseWriter, r *http.Request) {
 	var ret api.JsonProjections
 	RestHandlePost(w, r, "Write-Projections", &ret, ret, "projections")
+	api.CacheWait()
 
 	// Reload the projection so ID is populated correctly (unfortunately Postgres driver does not handle
 	// getting this without simply doing a reselect)
 	var refData api.JsonRefData
 	err := api.RefDataByID(ret.RefDataID, &refData)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	err = api.ProjectionsBySymbol(refData.Symbol, &ret)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 }
@@ -220,6 +220,7 @@ func Projections(w http.ResponseWriter, r *http.Request) {
 func ProjectionsByID(w http.ResponseWriter, r *http.Request) {
 	var ret api.JsonProjections
 	RestHandlePut(w, r, "Write-ProjectionsByID", &ret, ret, "projections")
+	api.CacheWait()
 }
 
 func PortfoliosByID(w http.ResponseWriter, r *http.Request) {
@@ -292,11 +293,11 @@ func MergersByID(w http.ResponseWriter, r *http.Request) {
 
 func EnrichedMergers(w http.ResponseWriter, r *http.Request) {
 	var input api.JsonEnrichedMerger
-	cmn.Enter("Write-EnrichedMergers", w, r)
+	api.Enter("Write-EnrichedMergers", w, r)
 
 	err := json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -304,14 +305,14 @@ func EnrichedMergers(w http.ResponseWriter, r *http.Request) {
 	var targetRefData api.JsonRefData
 	err = api.RefDataBySymbol(input.TargetTicker, &targetRefData)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	var acquirerRefData api.JsonRefData
 	err = api.RefDataBySymbol(input.AcquirerTicker, &acquirerRefData)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -320,20 +321,20 @@ func EnrichedMergers(w http.ResponseWriter, r *http.Request) {
 	ret.TargetRefDataID = targetRefData.ID
 	ret.AcquirerRefDataID = acquirerRefData.ID
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	_, err = db.NamedExec(api.JsonToNamedInsert(ret, "mergers"), &ret)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	json.NewEncoder(w).Encode(&ret)
-	cmn.Exit("Write-EnrichedMergers", &ret)
+	api.Exit("Write-EnrichedMergers", &ret)
 }
 
 func EnrichedMergersJournalByIDDelete(w http.ResponseWriter, r *http.Request) {
@@ -341,39 +342,39 @@ func EnrichedMergersJournalByIDDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func EnrichedMergersJournalByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Write-EnrichedMergersJournalByID", w, r)
+	api.Enter("Write-EnrichedMergersJournalByID", w, r)
 	var input api.JsonEnrichedMergerJournal
 	params := mux.Vars(r)
 	id := params["id"]
 	err := json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	// Only the entry can be updated
 	_, err = db.Exec("UPDATE mergers_journal SET entry=$1 WHERE id=$2", input.Entry, id)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(input)
-	cmn.Exit("Write-EnrichedMergersJournalByID", input)
+	api.Exit("Write-EnrichedMergersJournalByID", input)
 }
 
 func EnrichedMergersJournal(w http.ResponseWriter, r *http.Request) {
 	var input api.JsonEnrichedMergerJournal
-	cmn.Enter("Write-EnrichedMergersJournal", w, r)
+	api.Enter("Write-EnrichedMergersJournal", w, r)
 
 	err := json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -381,7 +382,7 @@ func EnrichedMergersJournal(w http.ResponseWriter, r *http.Request) {
 	var em api.JsonEnrichedMerger
 	err = api.EnrichedMergersByID(input.MergerID, &em)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	ret := api.JsonEnrichedMergerJournal{JsonEnrichedMerger: em}
@@ -391,20 +392,20 @@ func EnrichedMergersJournal(w http.ResponseWriter, r *http.Request) {
 	ret.Entry = input.Entry
 
 	// First, tweak the date on the merger (on every journal entry the user is reaffirming the merger)
-	err = cmn.DbNamedExec(fmt.Sprintf("%s WHERE id=%d", api.JsonToNamedUpdate(ret.JsonMerger, "mergers"), ret.MergerID), &ret.JsonMerger)
+	err = api.DbNamedExec(fmt.Sprintf("%s WHERE id=%d", api.JsonToNamedUpdate(ret.JsonMerger, "mergers"), ret.MergerID), &ret.JsonMerger)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
-	err = cmn.DbNamedExec(api.JsonToNamedInsert(ret, "mergers_journal"), &ret)
+	err = api.DbNamedExec(api.JsonToNamedInsert(ret, "mergers_journal"), &ret)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	json.NewEncoder(w).Encode(&ret)
-	cmn.Exit("Write-EnrichedMergersJournal", &ret)
+	api.Exit("Write-EnrichedMergersJournal", &ret)
 }
 
 func EnrichedProjectionsJournalByIDDelete(w http.ResponseWriter, r *http.Request) {
@@ -420,39 +421,39 @@ func PositionsHistoryByDateDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func EnrichedProjectionsJournalByID(w http.ResponseWriter, r *http.Request) {
-	cmn.Enter("Write-EnrichedProjectionsJournalByID", w, r)
+	api.Enter("Write-EnrichedProjectionsJournalByID", w, r)
 	var input api.JsonEnrichedProjectionsJournal
 	params := mux.Vars(r)
 	id := params["id"]
 	err := json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	// Only the entry can be updated
 	_, err = db.Exec("UPDATE projections_journal SET entry=$1 WHERE id=$2", input.Entry, id)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(input)
-	cmn.Exit("Write-EnrichedProjectionsJournalByID", input)
+	api.Exit("Write-EnrichedProjectionsJournalByID", input)
 }
 
 func EnrichedProjectionsJournal(w http.ResponseWriter, r *http.Request) {
 	var input api.JsonEnrichedProjectionsJournal
-	cmn.Enter("Write-EnrichedProjectionsJournal", w, r)
+	api.Enter("Write-EnrichedProjectionsJournal", w, r)
 
 	err := json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -460,23 +461,23 @@ func EnrichedProjectionsJournal(w http.ResponseWriter, r *http.Request) {
 	var ep api.JsonEnrichedProjections
 	err = api.EnrichedProjectionsByID(input.ProjectionsID, &ep)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 	ret := api.JsonEnrichedProjectionsJournal{JsonEnrichedProjections: ep}
 	ret.Date = input.Date
 	ret.Entry = input.Entry
 
-	db, err := cmn.DbConnect()
+	db, err := api.DbConnect()
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	// First, tweak the date on the projections (on every journal entry the user is reaffirming the projections)
 	_, err = db.NamedExec(fmt.Sprintf("%s WHERE id=%d", api.JsonToNamedUpdate(ret.JsonProjections, "projections"), ret.ID), &ret.JsonProjections)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
@@ -485,17 +486,17 @@ func EnrichedProjectionsJournal(w http.ResponseWriter, r *http.Request) {
 	ret.ID = 0
 	_, err = db.NamedExec(api.JsonToNamedInsert(ret, "projections_journal"), &ret)
 	if err != nil {
-		cmn.ErrorHttp(err, w, http.StatusInternalServerError)
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	json.NewEncoder(w).Encode(&ret)
-	cmn.Exit("Write-EnrichedProjectionsJournal", &ret)
+	api.Exit("Write-EnrichedProjectionsJournal", &ret)
 }
 
 func main() {
 	log.Println("Listening on http://localhost:8083/blue-lion/write")
 	router := mux.NewRouter().StrictSlash(true)
 	setupRouter(router)
-	log.Fatal(http.ListenAndServe(":8083", cmn.CorsMiddleware(router)))
+	log.Fatal(http.ListenAndServe(":8083", api.CorsMiddleware(router)))
 }
