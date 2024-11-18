@@ -34,6 +34,7 @@ func JobValuationCutInternal() error {
 		/*"DWL.L"*/ 3737: CONST_FX_GBP,
 		/*"U11.SI"*/ 3126: CONST_FX_SGD,
 		/*"BOL.PA"*/ 55: CONST_FX_EUR,
+		/*"HEIO.AS"*/ 6486: CONST_FX_EUR,
 	}
 
 	// Update price, value, index for all active by price positions
