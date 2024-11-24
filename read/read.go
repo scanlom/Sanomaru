@@ -1125,8 +1125,10 @@ func FactorsByTicker(w http.ResponseWriter, r *http.Request) {
 			f.RevenueCagr = math.Pow(f.RevenueGrowth+1.0, 1.0/float64(i)) - 1.0
 			f.SharesDilutedGrowth = api.Round(float64(f.SharesDiluted)/float64(income[0].SharesDiluted), 0.0001) - 1.0
 			f.SharesDilutedCagr = math.Pow(f.SharesDilutedGrowth+1.0, 1.0/float64(i)) - 1.0
-			f.EPSGrowth = api.Round(float64(income[0].EPS)/float64(f.EPS), 0.0001) - 1.0
-			f.EPSCagr = math.Pow(f.EPSGrowth+1.0, 1.0/float64(i)) - 1.0
+			if f.EPS > 0 {
+				f.EPSGrowth = api.Round(float64(income[0].EPS)/float64(f.EPS), 0.0001) - 1.0
+				f.EPSCagr = math.Pow(f.EPSGrowth+1.0, 1.0/float64(i)) - 1.0
+			}
 		}
 		ret = append(ret, f)
 	}
