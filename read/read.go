@@ -79,6 +79,7 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/transactions", TransactionsByPortfolioID).Methods("GET").Queries("portfolioId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/transactions", Transactions).Methods("GET")
 	router.HandleFunc("/blue-lion/read/factors", FactorsByTicker).Queries("ticker", "").Methods("GET")
+	router.HandleFunc("/blue-lion/read/conversion", ConversionByTicker).Queries("ticker", "").Methods("GET")
 	router.Methods("GET").Path("/blue-lion/read/scalar").HandlerFunc(Scalar)
 }
 
@@ -1135,6 +1136,46 @@ func FactorsByTicker(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(&ret)
 
 	api.Exit("Read-FactorsByTicker", ret)
+}
+
+func ConversionByTicker(w http.ResponseWriter, r *http.Request) {
+	api.Enter("Read-ConversionByTicker", w, r)
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	args := new(api.RestTickerInput)
+	decoder := schema.NewDecoder()
+	err := decoder.Decode(args, r.URL.Query())
+	if err != nil {
+		api.ErrorHttp(err, w, http.StatusBadRequest)
+		return
+	}
+
+	var cashflow []api.JsonCashflow
+	err = api.CashflowByTicker(args.Ticker, &cashflow)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	ret := []api.JsonConversion{}
+	for i := range cashflow {
+		f := api.JsonConversion{}
+		f.ReportDate = cashflow[i].ReportDate
+		denom := float64(cashflow[i].NetIncomeStart)
+		if denom > 0 {
+			f.NetCashOps = float64(cashflow[i].NetCashOps) / denom
+			f.NetChgCash = float64(cashflow[i].NetChgCash*-1) / denom
+			f.NetCashInv = float64(cashflow[i].NetCashInv) / denom
+			f.DividendsPaid = float64(cashflow[i].DividendsPaid) / denom
+			f.CashRepayDebt = float64(cashflow[i].CashRepayDebt) / denom
+			f.CashRepurchaseEquity = float64(cashflow[i].CashRepurchaseEquity) / denom
+		}
+		ret = append(ret, f)
+	}
+	json.NewEncoder(w).Encode(&ret)
+
+	api.Exit("Read-ConversionByTicker", ret)
 }
 
 func Mergers(w http.ResponseWriter, r *http.Request) {

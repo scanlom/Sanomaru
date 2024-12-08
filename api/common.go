@@ -278,7 +278,7 @@ func CacheFlushAll() error {
 }
 
 func CacheWait() {
-	time.Sleep(1 * time.Second) 
+	time.Sleep(1 * time.Second)
 }
 
 func DbConnect() (*sqlx.DB, error) {
@@ -824,9 +824,19 @@ type JsonFactors struct {
 	SharesDiluted       int64   `json:"sharesDiluted"`
 	SharesDilutedGrowth float64 `json:"sharesDilutedGrowth"`
 	SharesDilutedCagr   float64 `json:"sharesDilutedCagr"`
-	EPS       float64 `json:"eps"`
-	EPSGrowth float64 `json:"epsGrowth"`
-	EPSCagr   float64 `json:"epsCagr"`
+	EPS                 float64 `json:"eps"`
+	EPSGrowth           float64 `json:"epsGrowth"`
+	EPSCagr             float64 `json:"epsCagr"`
+}
+
+type JsonConversion struct {
+	ReportDate           string  `json:"reportDate"`
+	NetCashOps           float64 `json:"netCashOps"`
+	NetChgCash           float64 `json:"netChgCash"`
+	NetCashInv           float64 `json:"netCashInv"`
+	DividendsPaid        float64 `json:"dividendsPaid"`
+	CashRepayDebt        float64 `json:"cashRepayDebt"`
+	CashRepurchaseEquity float64 `json:"cashRepurchaseEquity"`
 }
 
 func JsonToNamedInsertInternal(t reflect.Type, cols *string, params *string) {
