@@ -161,6 +161,13 @@ func Projections(slice *[]JsonProjections) error {
 	)
 }
 
+func Users(slice *[]JsonUser) error {
+	return RestGetByUrl("Users",
+		"http://localhost:8081/blue-lion/read/users",
+		slice,
+	)
+}
+
 func MarketDataBySymbol(symbol string, ret *JsonMarketData) error {
 	return RestGetByUrl("MarketDataBySymbol",
 		fmt.Sprintf("http://localhost:8081/blue-lion/read/market-data?symbol=%s", symbol),
@@ -248,6 +255,13 @@ func EnrichedPositionsByID(id int, ret *JsonEnrichedPosition) error {
 func Portfolios(slice *[]JsonPortfolio) error {
 	return RestGetByUrl("Portfolios",
 		"http://localhost:8081/blue-lion/read/portfolios",
+		slice,
+	)
+}
+
+func PortfoliosByUserID(userId int, slice *[]JsonPortfolio) error {
+	return RestGetByUrl("PortfoliosByUserID",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/portfolios?userId=%d", userId),
 		slice,
 	)
 }

@@ -26,13 +26,12 @@ import (
 const CONST_PRICING_TYPE_BY_PRICE = 1
 const CONST_PRICING_TYPE_BY_VALUE = 2
 
-const CONST_PORTFOLIO_TOTAL = 1
 const CONST_PORTFOLIO_SELFIE = 2
 const CONST_PORTFOLIO_OAK = 3
 const CONST_PORTFOLIO_MANAGED = 4
 const CONST_PORTFOLIO_RISK_ARB = 5
 const CONST_PORTFOLIO_TRADE_FIN = 6
-const CONST_PORTFOLIO_QUICK = 7
+const CONST_PORTFOLIO_HQLA = 7
 const CONST_PORTFOLIO_PORTFOLIO = 8
 const CONST_PORTFOLIO_NONE = 99
 
@@ -89,6 +88,11 @@ type RestPortfolioIDInput struct {
 type RestRefDataIDInput struct {
 	RefDataID int `schema:"refDataId"`
 }
+
+type RestUserIDInput struct {
+	UserID int `schema:"userId"`
+}
+
 type RestTickerInput struct {
 	Ticker string `schema:"ticker"`
 }
@@ -436,6 +440,11 @@ type JsonTableID struct {
 	ID    int    `json:"id"`
 }
 
+type JsonUser struct {
+	ID   int    `json:"id" db:"id"`
+	Name string `json:"name" db:"name"`
+}
+
 type JsonRefData struct {
 	ID                 int    `json:"id" db:"id"`
 	Symbol             string `json:"symbol" db:"symbol"`
@@ -719,6 +728,7 @@ type JsonEnrichedMergerJournal struct {
 
 type JsonPortfolio struct {
 	ID                  int     `json:"id" db:"id"`
+	UserID              int     `json:"userId" db:"user_id"`
 	Name                string  `json:"name" db:"name"`
 	Value               float64 `json:"value" db:"value"`
 	Index               float64 `json:"index" db:"index"`
@@ -731,6 +741,7 @@ type JsonPortfolio struct {
 	TotalCashInfusion   float64 `json:"totalCashInfusion" db:"total_cash_infusion"`
 	Model               float64 `json:"model" db:"model"`
 	Active              bool    `json:"active" db:"active"`
+	Total               bool    `json:"total" db:"total"`
 }
 
 type JsonEnrichedPortfolio struct {

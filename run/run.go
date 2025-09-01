@@ -78,17 +78,40 @@ func JobValuationCutInternal() error {
 		}
 	}
 
-	// Update value, index for all active portfolios
+	// Update value, index for all active portfolios. Note this code depends on the portfolios being sorted by user, with the total portfolio
+	// first for each user. This is the way they are setup in the portfolios table, and our query uses an order by, so should be good
 	var portfolios []api.JsonPortfolio
 	err = api.Portfolios(&portfolios)
 	if err != nil {
 		return err
 	}
 
+	tid := -1
+	userId := -1
 	totalValue := 0.0
 	totalValueTotalCapital := 0.0
 	for i := range portfolios {
-		if portfolios[i].Active && portfolios[i].ID > 1 {
+		if portfolios[i].UserID != userId { // If we've crossed into another user, handle the total portfolio
+			if tid >= 0 { // Update the total portfolio for the previous user (if there was one)
+				log.Printf("Updating total portfolio %d", portfolios[tid].ID)
+				portfolios[tid].Value = totalValue + portfolios[tid].Cash - portfolios[tid].Debt
+				log.Printf("%f = %f Positions + %f Cash - %f Debt", portfolios[tid].Value, totalValue, portfolios[tid].Cash, portfolios[tid].Debt)
+				portfolios[tid].ValueTotalCapital = totalValueTotalCapital + portfolios[tid].Cash
+				portfolios[tid].Index = portfolios[tid].Value * portfolios[tid].Divisor
+				portfolios[tid].IndexTotalCapital = portfolios[tid].ValueTotalCapital * portfolios[tid].DivisorTotalCapital
+				err = api.PutPortfolio(portfolios[tid])
+				if err != nil {
+					return err
+				}
+				log.Printf("Total portfolio %d update complete", portfolios[tid].ID)
+			}
+			// The current portfolio is the total portfolio for the current user, so start tracking totals and don't update it until
+			// we're done with the other portfolios
+			tid = i
+			userId = portfolios[i].UserID
+			totalValue = 0.0
+			totalValueTotalCapital = 0.0
+		} else if portfolios[i].Active {
 			log.Printf("Updating portfolio %d", portfolios[i].ID)
 			positionsTotal := 0.0
 			// The number of positions is small so we aren't bothering with efficiency here. Just loop through and find the positions we want
@@ -112,18 +135,18 @@ func JobValuationCutInternal() error {
 		}
 	}
 
-	// Update value, index for the top level portfolio
-	for i := range portfolios {
-		if portfolios[i].ID == 1 {
-			portfolios[i].Value = totalValue + portfolios[i].Cash - portfolios[i].Debt
-			portfolios[i].ValueTotalCapital = totalValueTotalCapital + portfolios[i].Cash
-			portfolios[i].Index = portfolios[i].Value * portfolios[i].Divisor
-			portfolios[i].IndexTotalCapital = portfolios[i].ValueTotalCapital * portfolios[i].DivisorTotalCapital
-			err = api.PutPortfolio(portfolios[i])
-			if err != nil {
-				return err
-			}
+	if tid >= 0 { // Update the total portfolio for the final user (if there was one)
+		log.Printf("Updating total portfolio %d", portfolios[tid].ID)
+		portfolios[tid].Value = totalValue + portfolios[tid].Cash - portfolios[tid].Debt
+		log.Printf("%f = %f Positions + %f Cash - %f Debt", portfolios[tid].Value, totalValue, portfolios[tid].Cash, portfolios[tid].Debt)
+		portfolios[tid].ValueTotalCapital = totalValueTotalCapital + portfolios[tid].Cash
+		portfolios[tid].Index = portfolios[tid].Value * portfolios[tid].Divisor
+		portfolios[tid].IndexTotalCapital = portfolios[tid].ValueTotalCapital * portfolios[tid].DivisorTotalCapital
+		err = api.PutPortfolio(portfolios[tid])
+		if err != nil {
+			return err
 		}
+		log.Printf("Total portfolio %d update complete", portfolios[tid].ID)
 	}
 
 	// Copy over history
@@ -274,9 +297,9 @@ func ExecuteBookTransaction(w http.ResponseWriter, r *http.Request) {
 		portfolio.DivisorTotalCapital = portfolio.IndexTotalCapital / portfolio.ValueTotalCapital
 
 		// If this is a sub portfolio, update top level cash also
-		if portfolio.ID != api.CONST_PORTFOLIO_TOTAL {
+		if portfolio.ID != portfolio.UserID {
 			var topPortfolio api.JsonEnrichedPortfolio
-			err = api.EnrichedPortfoliosByID(api.CONST_PORTFOLIO_TOTAL, &topPortfolio)
+			err = api.EnrichedPortfoliosByID(portfolio.UserID, &topPortfolio)
 			if err != nil {
 				api.ErrorHttp(err, w, http.StatusInternalServerError)
 				return
