@@ -308,6 +308,13 @@ func PortfoliosHistoryPortfolioIDDate(portfolioId int, date string, ret *JsonPor
 	)
 }
 
+func PortfoliosHistoryFirst(portfolioId int, ret *JsonPortfolioHistory) error {
+	return RestGetByUrl("PortfoliosHistoryFirst",
+		fmt.Sprintf("http://localhost:8081/blue-lion/read/portfolios-history-first?portfolioId=%d", portfolioId),
+		ret,
+	)
+}
+
 func PositionsHistoryByPortfolioIDDate(portfolioId int, date string, slice *[]JsonPositionHistory) error {
 	return RestGetByUrl("PositionsHistoryByPortfolioIDDate",
 		fmt.Sprintf("http://localhost:8081/blue-lion/read/positions-history?portfolioId=%d&date=%s", portfolioId, date),
@@ -322,7 +329,7 @@ func PositionsHistoryByPositionIDDate(positionId int, date string, ret *JsonPosi
 	)
 }
 
-func PositionsHistoryFirst(positionId int, date string, ret *JsonPositionHistory) error {
+func PositionsHistoryFirst(positionId int, ret *JsonPositionHistory) error {
 	return RestGetByUrl("PositionsHistoryFirst",
 		fmt.Sprintf("http://localhost:8081/blue-lion/read/positions-history-first?positionId=%d", positionId),
 		ret,

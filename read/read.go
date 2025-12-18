@@ -59,6 +59,7 @@ func setupRouter(router *mux.Router) {
 	router.HandleFunc("/blue-lion/read/enriched-portfolios", EnrichedPortfolios).Methods("GET")
 	router.HandleFunc("/blue-lion/read/portfolios-history", PortfoliosHistoryByPortfolioIDDate).Queries("portfolioId", "", "date", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/portfolios-history", PortfoliosHistoryByDate).Queries("date", "").Methods("GET")
+	router.HandleFunc("/blue-lion/read/portfolios-history-first", PortfoliosHistoryFirst).Queries("portfolioId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/portfolios-history-max-date", PortfoliosHistoryMaxDate).Methods("GET")
 	router.HandleFunc("/blue-lion/read/portfolios-history-max-index", PortfoliosHistoryMaxIndexByPortfolioID).Queries("portfolioId", "").Methods("GET")
 	router.HandleFunc("/blue-lion/read/positions/{id}", PositionsByID).Methods("GET")
@@ -1387,6 +1388,28 @@ func EnrichedPortfoliosByUserID(w http.ResponseWriter, r *http.Request) {
 	api.Exit("Read-EnrichedPortfoliosByUserID", ret)
 }
 
+func PortfoliosHistoryFirst(w http.ResponseWriter, r *http.Request) {
+	api.Enter("Read-PortfoliosHistoryFirst", w, r)
+
+	args := new(api.RestPortfolioIDInput)
+	decoder := schema.NewDecoder()
+	err := decoder.Decode(args, r.URL.Query())
+	if err != nil {
+		api.ErrorHttp(err, w, http.StatusBadRequest)
+		return
+	}
+
+	ret := api.JsonPortfolioHistory{}
+	err = api.DbGet(&ret, api.JsonToSelect(api.JsonPortfolioHistory{}, fmt.Sprintf("portfolios_history WHERE portfolio_id=%d and date=(select min(date) from portfolios_history where portfolio_id=%d)", args.PortfolioID, args.PortfolioID), ""))
+	if err != nil {
+		api.ErrorHttp(err, w, http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(&ret)
+
+	api.Exit("Read-PortfoliosHistoryFirst", ret)
+}
+
 func PortfoliosHistoryByDate(w http.ResponseWriter, r *http.Request) {
 	api.Enter("Read-PortfoliosHistoryByDate", w, r)
 
@@ -1668,8 +1691,11 @@ func EnrichYTDPortfolioReturns(r *api.JsonReturns, value float64, index float64,
 	physd := api.JsonPortfolioHistory{}
 	err = api.PortfoliosHistoryPortfolioIDDate(r.ID, yearStartDate, &physd)
 	if err != nil {
-		// If there was no position on the first of the year, that's ok, returns are just zero
-		return nil
+		// If there was no portfolio on the first of the year or before, get the latest one
+		err = api.PortfoliosHistoryFirst(r.ID, &physd)
+		if err != nil {
+			return nil
+		}
 	}
 
 	if physd.Index > 0 {
@@ -1694,8 +1720,11 @@ func EnrichYTDPositionReturns(r *api.JsonReturns, value float64, index float64, 
 	physd := api.JsonPositionHistory{}
 	err = api.PositionsHistoryByPositionIDDate(r.ID, yearStartDate, &physd)
 	if err != nil {
-		// If there was no position on the first of the year, that's ok, returns are just zero
-		return nil
+		// If there was no position on the first of the year or before, get the latest one
+		err = api.PositionsHistoryFirst(r.ID, &physd)
+		if err != nil {
+			return nil
+		}
 	}
 
 	if physd.Index > 0 {
