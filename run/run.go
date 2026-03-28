@@ -19,11 +19,11 @@ func setupRouter(router *mux.Router) {
 
 func JobValuationCutInternal() error {
 	log.Println("JobValuationCutInternal: Called...")
-	CONST_FX_EUR := 0.92
-	CONST_FX_GBP := 79.34
+	CONST_FX_EUR := 0.86
+	CONST_FX_GBP := 74.00
 	CONST_FX_HKD := 7.79
-	CONST_FX_JPY := 148.16
-	CONST_FX_SGD := 1.35
+	CONST_FX_JPY := 156.61
+	CONST_FX_SGD := 1.28
 	rates := map[int]float64{
 		/*"1373.HK"*/ 76: CONST_FX_HKD,
 		/*"2788.HK"*/ 3288: CONST_FX_HKD,
@@ -35,6 +35,7 @@ func JobValuationCutInternal() error {
 		/*"U11.SI"*/ 3126: CONST_FX_SGD,
 		/*"BOL.PA"*/ 55: CONST_FX_EUR,
 		/*"HEIO.AS"*/ 6486: CONST_FX_EUR,
+		/*"DOM.L"*/ 6805: CONST_FX_GBP,
 	}
 
 	// Update price, value, index for all active by price positions
