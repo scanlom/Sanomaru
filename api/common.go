@@ -842,13 +842,23 @@ type JsonFactors struct {
 }
 
 type JsonConversion struct {
-	ReportDate           string  `json:"reportDate"`
-	NetCashOps           float64 `json:"netCashOps"`
-	NetChgCash           float64 `json:"netChgCash"`
-	NetCashInv           float64 `json:"netCashInv"`
-	DividendsPaid        float64 `json:"dividendsPaid"`
-	CashRepayDebt        float64 `json:"cashRepayDebt"`
-	CashRepurchaseEquity float64 `json:"cashRepurchaseEquity"`
+	ReportDate                string  `json:"reportDate"`
+	NetIncomeStart            int64   `json:"netIncomeStart"`
+	NetCashOps                int64   `json:"netCashOps"`
+	NetCashOpsPct             float64 `json:"netCashOpsPct"`
+	NetCashInv                int64   `json:"netCashInv"`
+	NetCashInvPct             float64 `json:"netCashInvPct"`
+	NetCashFin                int64   `json:"netCashFin"`
+	NetCashFinPct             float64 `json:"netCashFinPct"`
+	NetChgCash                int64   `json:"netChgCash"`
+	NetChgCashPct             float64 `json:"netChgCashPct"`
+	DividendsPaid             int64   `json:"dividendsPaid"`
+	DividendsPaidYield        float64 `json:"dividendsPaidYield"`
+	CashRepayDebt             int64   `json:"cashRepayDebt"`
+	CashRepayDebtYield        float64 `json:"cashRepayDebtYield"`
+	CashRepurchaseEquity      int64   `json:"cashRepurchaseEquity"`
+	CashRepurchaseEquityYield float64 `json:"cashRepurchaseEquityYield"`
+	MarketCap                 int64   `json:"marketCap"`
 }
 
 func JsonToNamedInsertInternal(t reflect.Type, cols *string, params *string) {

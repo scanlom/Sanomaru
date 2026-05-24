@@ -1070,7 +1070,7 @@ func SummaryByTicker(w http.ResponseWriter, r *http.Request) {
 			s.OpMgn = float64(income[i].OperatingIncome) / float64(income[i].Revenue)
 			s.NetMgn = float64(income[i].NetIncomeCommon) / float64(income[i].Revenue)
 		}
-		if s.EPS != 0.0 {
+		if s.EPS > 0.0 {
 			s.PEHigh = int(math.Round(mdhYearSummary.High / s.EPS))
 			s.PELow = int(math.Round(mdhYearSummary.Low / s.EPS))
 		}
@@ -1169,20 +1169,41 @@ func ConversionByTicker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var summary []api.JsonSummary
+	err = api.SummaryByTicker(args.Ticker, &summary)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	ret := []api.JsonConversion{}
 	for i := range cashflow {
-		f := api.JsonConversion{}
-		f.ReportDate = cashflow[i].ReportDate
-		denom := float64(cashflow[i].NetIncomeStart)
-		if denom > 0 {
-			f.NetCashOps = float64(cashflow[i].NetCashOps) / denom
-			f.NetChgCash = float64(cashflow[i].NetChgCash*-1) / denom
-			f.NetCashInv = float64(cashflow[i].NetCashInv) / denom
-			f.DividendsPaid = float64(cashflow[i].DividendsPaid) / denom
-			f.CashRepayDebt = float64(cashflow[i].CashRepayDebt) / denom
-			f.CashRepurchaseEquity = float64(cashflow[i].CashRepurchaseEquity) / denom
+		if i < len(summary) {
+			f := api.JsonConversion{}
+			f.ReportDate = cashflow[i].ReportDate
+			denom := float64(cashflow[i].NetIncomeStart)
+			marketCap := float64(summary[i].MarketCap)
+			if denom != 0 && marketCap > 0 {
+				f.NetIncomeStart = cashflow[i].NetIncomeStart
+				f.NetCashOps = cashflow[i].NetCashOps
+				f.NetCashOpsPct = float64(cashflow[i].NetCashOps) / denom
+				f.NetCashInv = cashflow[i].NetCashInv
+				f.NetCashInvPct = float64(cashflow[i].NetCashInv) / denom
+				f.NetCashFin = cashflow[i].NetCashFin
+				f.NetCashFinPct = float64(cashflow[i].NetCashFin) / denom
+				f.NetChgCash = cashflow[i].NetChgCash
+				f.NetChgCashPct = float64(cashflow[i].NetChgCash) / denom
+				f.DividendsPaid = cashflow[i].DividendsPaid * -1
+				f.DividendsPaidYield = float64(f.DividendsPaid) / marketCap
+				f.CashRepayDebt = cashflow[i].CashRepayDebt * -1
+				f.CashRepayDebtYield = float64(f.CashRepayDebt) / marketCap
+				f.CashRepurchaseEquity = cashflow[i].CashRepurchaseEquity * -1
+				f.CashRepurchaseEquityYield = float64(f.CashRepurchaseEquity) / marketCap
+				f.MarketCap = summary[i].MarketCap
+			}
+			ret = append(ret, f)
 		}
-		ret = append(ret, f)
 	}
 	json.NewEncoder(w).Encode(&ret)
 
