@@ -1062,12 +1062,13 @@ func SummaryByTicker(w http.ResponseWriter, r *http.Request) {
 		ebitda := income[i].NetIncome - income[i].InterestExpNet - income[i].IncomeTax - income[i].DeprAmor // Expenses are stored as negative
 		s.ReportDate = income[i].ReportDate
 		s.EPS = income[i].EPS
+		s.Revenue = income[i].Revenue
 		s.SharesDiluted = income[i].SharesDiluted
 		s.MarketCap = int64(mdhYearSummary.Close * float64(s.SharesDiluted))
 		if income[i].Revenue > 0.0 {
 			s.GrMgn = float64(income[i].GrossProfit) / float64(income[i].Revenue)
 			s.OpMgn = float64(income[i].OperatingIncome) / float64(income[i].Revenue)
-			s.NetMgn = float64(income[i].NetIncome) / float64(income[i].Revenue)
+			s.NetMgn = float64(income[i].NetIncomeCommon) / float64(income[i].Revenue)
 		}
 		if s.EPS != 0.0 {
 			s.PEHigh = int(math.Round(mdhYearSummary.High / s.EPS))
@@ -1110,8 +1111,8 @@ func FactorsByTicker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var income []api.JsonIncome
-	err = api.IncomeByTicker(args.Ticker, &income)
+	var summary []api.JsonSummary
+	err = api.SummaryByTicker(args.Ticker, &summary)
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -1120,19 +1121,24 @@ func FactorsByTicker(w http.ResponseWriter, r *http.Request) {
 
 	ret := []api.JsonFactors{}
 
-	for i := range income {
+	for i := range summary {
 		f := api.JsonFactors{}
-		f.ReportDate = income[i].ReportDate
-		f.Revenue = income[i].Revenue
-		f.SharesDiluted = income[i].SharesDiluted
-		f.EPS = income[i].EPS
+		f.ReportDate = summary[i].ReportDate
+		f.Revenue = summary[i].Revenue
+		f.NetMgn = summary[i].NetMgn
+		f.SharesDiluted = summary[i].SharesDiluted
+		f.EPS = summary[i].EPS
 		if i > 0 {
-			f.RevenueGrowth = api.Round(float64(income[0].Revenue)/float64(f.Revenue), 0.0001) - 1.0
+			f.RevenueGrowth = api.Round(float64(summary[0].Revenue)/float64(f.Revenue), 0.0001) - 1.0
 			f.RevenueCagr = math.Pow(f.RevenueGrowth+1.0, 1.0/float64(i)) - 1.0
-			f.SharesDilutedGrowth = api.Round(float64(f.SharesDiluted)/float64(income[0].SharesDiluted), 0.0001) - 1.0
+			if f.NetMgn > 0.0 {
+				f.NetMgnGrowth = api.Round(float64(summary[0].NetMgn)/float64(f.NetMgn), 0.0001) - 1.0
+				f.NetMgnCagr = math.Pow(f.NetMgnGrowth+1.0, 1.0/float64(i)) - 1.0
+			}
+			f.SharesDilutedGrowth = api.Round(float64(f.SharesDiluted)/float64(summary[0].SharesDiluted), 0.0001) - 1.0
 			f.SharesDilutedCagr = math.Pow(f.SharesDilutedGrowth+1.0, 1.0/float64(i)) - 1.0
 			if f.EPS > 0 {
-				f.EPSGrowth = api.Round(float64(income[0].EPS)/float64(f.EPS), 0.0001) - 1.0
+				f.EPSGrowth = api.Round(float64(summary[0].EPS)/float64(f.EPS), 0.0001) - 1.0
 				f.EPSCagr = math.Pow(f.EPSGrowth+1.0, 1.0/float64(i)) - 1.0
 			}
 		}

@@ -677,6 +677,7 @@ type JsonSummary struct {
 	NetMgn        float64 `json:"netMgn"`
 	LTDRatio      float64 `json:"ltdRatio"`
 	IntCov        float64 `json:"intCov"`
+	Revenue       int64   `json:"revenue"`
 	MarketCap     int64   `json:"marketCap"`
 	SharesDiluted int64   `json:"sharesDiluted" db:"shares_diluted"`
 }
@@ -830,8 +831,8 @@ type JsonFactors struct {
 	RevenueGrowth       float64 `json:"revenueGrowth"`
 	RevenueCagr         float64 `json:"revenueCagr"`
 	NetMgn              float64 `json:"netMgn"`
-	NetMgnGrowth        float64 `json:"NetMgnGrowth"`
-	NetMgnCagr          float64 `json:"NetMgnCagr"`
+	NetMgnGrowth        float64 `json:"netMgnGrowth"`
+	NetMgnCagr          float64 `json:"netMgnCagr"`
 	SharesDiluted       int64   `json:"sharesDiluted"`
 	SharesDilutedGrowth float64 `json:"sharesDilutedGrowth"`
 	SharesDilutedCagr   float64 `json:"sharesDilutedCagr"`
