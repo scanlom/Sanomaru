@@ -27,6 +27,7 @@ func JobValuationCutInternal() error {
 	rates := map[int]float64{
 		/*"1373.HK"*/ 76: CONST_FX_HKD,
 		/*"2788.HK"*/ 3288: CONST_FX_HKD,
+		/*"0113.HK"*/ 7129: CONST_FX_HKD,
 		/*"6670.T"*/ 2451: CONST_FX_JPY,
 		/*"8074.T"*/ 3303: CONST_FX_JPY,
 		/*"MRO.L"*/ 97: CONST_FX_GBP,

@@ -40,9 +40,11 @@ func PopulateEnrichedMerger(id int) {
 	closeTime := api.DateStringToTime(em.CloseDate)
 	strikeTime := api.DateStringToTime(em.AnnounceDate)
 	daysToClose := closeTime.Sub(time.Now()).Hours() / 24
-	fees := 0.005
+	fees := 0.005 // $0.005 per share for US stocks
 	if strings.Contains(em.TargetTicker, ".HK") {
 		fees = (0.0008 + 0.0013) * md.Last // 8 bps commision and 13 bps stamp on each side
+	} else if strings.Contains(em.TargetTicker, ".L") {
+		fees = (0.0005 + 0.0050) * md.Last // 5 bps commision and 50 bps stamp on buys
 	}
 	if em.BreakPrice > 0 {
 		em.Status = "B"

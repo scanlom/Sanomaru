@@ -1664,7 +1664,7 @@ func PositionsBySymbolPortfolioID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ret := api.JsonPosition{}
-	err = db.Get(&ret, api.JsonToSelect(api.JsonPosition{}, fmt.Sprintf("positions WHERE ref_data_id=%d and portfolio_id=%d", refData.ID, args.PortfolioID), ""))
+	err = db.Get(&ret, api.JsonToSelect(api.JsonPosition{}, fmt.Sprintf("positions WHERE ref_data_id=%d and portfolio_id=%d and active=true", refData.ID, args.PortfolioID), ""))
 	if err != nil {
 		api.ErrorHttp(err, w, http.StatusInternalServerError)
 		return
